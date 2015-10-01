@@ -8,7 +8,7 @@ Tuples
 .. autoclass:: pystorm.component.Tuple
 
 You should never have to instantiate an instance of a
-:class:`pystorm.component.Tuple` yourself as streamparse handles this for you
+:class:`pystorm.component.Tuple` yourself as pystorm handles this for you
 prior to, for example, a :class:`pystorm.bolt.Bolt`'s ``process()`` method
 being called.
 

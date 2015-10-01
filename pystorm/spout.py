@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class Spout(Component):
-    """Base class for all streamparse spouts.
+    """Base class for all pystorm spouts.
 
     For more information on spouts, consult Storm's
     `Concepts documentation <http://storm.apache.org/documentation/Concepts.html>`_.
@@ -63,7 +63,7 @@ class Spout(Component):
         """Implement this function to emit Tuples as necessary.
 
         This function should not block, or Storm will think the
-        spout is dead. Instead, let it return and streamparse will
+        spout is dead. Instead, let it return and pystorm will
         send a noop to storm, which lets it know the spout is functioning.
         """
         raise NotImplementedError()

@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class Bolt(Component):
-    """The base class for all streamparse bolts.
+    """The base class for all pystorm bolts.
 
     For more information on bolts, consult Storm's
     `Concepts documentation <http://storm.apache.org/documentation/Concepts.html>`_.
@@ -41,7 +41,7 @@ class Bolt(Component):
 
     .. code-block:: python
 
-        from streamparse.bolt import Bolt
+        from pystorm.bolt import Bolt
 
         class SentenceSplitterBolt(Bolt):
 
@@ -79,16 +79,16 @@ class Bolt(Component):
         pass
 
     def process(self, tup):
-        """Process a single Tuple :class:`streamparse.storm.component.Tuple` of
+        """Process a single Tuple :class:`pystorm.component.Tuple` of
         input
 
         This should be overridden by subclasses.
-        :class:`streamparse.storm.component.Tuple` objects contain metadata
+        :class:`pystorm.component.Tuple` objects contain metadata
         about which component, stream and task it came from. The actual values
         of the Tuple can be accessed by calling ``tup.values``.
 
         :param tup: the Tuple to be processed.
-        :type tup: :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`pystorm.component.Tuple`
         """
         raise NotImplementedError()
 
@@ -105,7 +105,7 @@ class Bolt(Component):
         is set to an integer value, the number of seconds.
 
         :param tup: the Tuple to be processed.
-        :type tup: :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`pystorm.component.Tuple`
         """
         pass
 
@@ -115,11 +115,11 @@ class Bolt(Component):
 
         :param tup: the Tuple payload to send to Storm, should contain only
                     JSON-serializable data.
-        :type tup: :class:`list` or :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`list` or :class:`pystorm.component.Tuple`
         :param stream: the ID of the stream to emit this Tuple to. Specify
                        ``None`` to emit to default stream.
         :type stream: str
-        :param anchors: IDs the Tuples (or :class:`streamparse.storm.component.Tuple`
+        :param anchors: IDs the Tuples (or :class:`pystorm.component.Tuple`
                         instances) which the emitted Tuples should be anchored
                         to. If ``auto_anchor`` is set to ``True`` and
                         you have not specified ``anchors``, ``anchors`` will be
@@ -148,7 +148,7 @@ class Bolt(Component):
         """Indicate that processing of a Tuple has succeeded.
 
         :param tup: the Tuple to acknowledge.
-        :type tup: :class:`str` or :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`str` or :class:`pystorm.component.Tuple`
         """
         tup_id = tup.id if isinstance(tup, Tuple) else tup
         self.send_message({'command': 'ack', 'id': tup_id})
@@ -157,7 +157,7 @@ class Bolt(Component):
         """Indicate that processing of a Tuple has failed.
 
         :param tup: the Tuple to fail (its ``id`` if ``str``).
-        :type tup: :class:`str` or :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`str` or :class:`pystorm.component.Tuple`
         """
         tup_id = tup.id if isinstance(tup, Tuple) else tup
         self.send_message({'command': 'fail', 'id': tup_id})
@@ -215,14 +215,6 @@ class BatchingBolt(Bolt):
     be optionally implemented so that Tuples are grouped before
     ``process_batch`` is even called.
 
-    You must also set the `topology.tick.tuple.freq.secs` to how frequently you
-    would like ticks to be sent.  If you want ``ticks_between_batches`` to work
-    the same way ``secs_between_batches`` worked in older versions of
-    streamparse, just set `topology.tick.tuple.freq.secs` to 1.  This setting
-    can be specified either at the topology level, or in the topology Clojure
-    file by adding `:conf {"topology.tick.tuple.freq.secs", 1}` to your
-    `python-bolt-spec`.
-
 
     :ivar auto_anchor: A ``bool`` indicating whether or not the bolt should
                        automatically anchor emits to the incoming Tuple ID.
@@ -244,7 +236,7 @@ class BatchingBolt(Bolt):
 
     .. code-block:: python
 
-        from streamparse.bolt import BatchingBolt
+        from pystorm.bolt import BatchingBolt
 
         class WordCounterBolt(BatchingBolt):
 
@@ -277,7 +269,7 @@ class BatchingBolt(Bolt):
         multiple batches based on a key.
 
         :param tup: the Tuple used to extract a group key
-        :type tup: :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`pystorm.component.Tuple`
         :returns: Any ``hashable`` value.
         """
         return None
@@ -287,7 +279,7 @@ class BatchingBolt(Bolt):
 
         :param key: the group key for the list of batches.
         :type key: hashable
-        :param tups: a `list` of :class:`streamparse.storm.component.Tuple` s
+        :param tups: a `list` of :class:`pystorm.component.Tuple` s
                      for the group.
         :type tups: list
         """
@@ -296,7 +288,7 @@ class BatchingBolt(Bolt):
     def emit(self, tup, **kwargs):
         """Modified emit that will not return task IDs after emitting.
 
-        See :class:`streamparse.storm.component.Bolt` for more information.
+        See :class:`pystorm.component.Bolt` for more information.
 
         :returns: ``None``.
         """
@@ -307,7 +299,7 @@ class BatchingBolt(Bolt):
         """Increment tick counter, and call ``process_batch`` for all current
         batches if tick counter exceeds ``ticks_between_batches``.
 
-        See :class:`streamparse.storm.component.Bolt` for more information.
+        See :class:`pystorm.component.Bolt` for more information.
 
         .. warning::
             This method should **not** be overriden.  If you want to tweak
@@ -428,7 +420,7 @@ class TicklessBatchingBolt(BatchingBolt):
 
     .. code-block:: python
 
-        from streamparse.bolt import TicklessBatchingBolt
+        from pystorm.bolt import TicklessBatchingBolt
 
         class WordCounterBolt(TicklessBatchingBolt):
 

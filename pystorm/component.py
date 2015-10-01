@@ -156,12 +156,12 @@ class Component(object):
 
                   .. note::
                     Using ``Component.logger`` combined with the
-                    :class:`streamparse.storm.component.StormHandler` handler is
+                    :class:`pystorm.component.StormHandler` handler is
                     the recommended way for logging messages from your
                     component. If you use ``Component.log`` instead, the logging
                     messages will *always* be sent to Storm, even if they are
                     ``debug`` level messages and you are running in production.
-                    Using :class:`streamparse.storm.component.StormHandler`
+                    Using :class:`pystorm.component.StormHandler`
                     ensures that you will instead have your logging messages
                     filtered on the Python side and only have the messages you
                     actually want logged serialized and sent to Storm.
@@ -228,15 +228,15 @@ class Component(object):
         # Set up logging
         self.logger = logging.getLogger('.'.join((__name__,
                                                   self.component_name)))
-        log_path = self.storm_conf.get('streamparse.log.path')
+        log_path = self.storm_conf.get('pystorm.log.path')
         if log_path:
             root_log = logging.getLogger()
-            max_bytes = self.storm_conf.get('streamparse.log.max_bytes',
+            max_bytes = self.storm_conf.get('pystorm.log.max_bytes',
                                             1000000)  # 1 MB
-            backup_count = self.storm_conf.get('streamparse.log.backup_count',
+            backup_count = self.storm_conf.get('pystorm.log.backup_count',
                                                10)
             log_file = join(log_path,
-                            ('streamparse_{topology_name}_{component_name}'
+                            ('pystorm_{topology_name}_{component_name}'
                              '_{task_id}_{pid}.log'
                              .format(topology_name=self.topology_name,
                                      component_name=self.component_name,
@@ -248,7 +248,7 @@ class Component(object):
                                           '%(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             root_log.addHandler(handler)
-            log_level = self.storm_conf.get('streamparse.log.level', 'info')
+            log_level = self.storm_conf.get('pystorm.log.level', 'info')
             log_level = _PYTHON_LOG_LEVELS.get(log_level, logging.INFO)
             if self.debug:
                 # potentially override logging that was provided if
@@ -257,12 +257,12 @@ class Component(object):
             root_log.setLevel(log_level)
         else:
             self.send_message({'command': 'log',
-                               'msg': ('WARNING: streamparse logging is not '
-                                       'configured. Please set streamparse.log.'
+                               'msg': ('WARNING: pystorm logging is not '
+                                       'configured. Please set pystorm.log.'
                                        'path in your config.json.')})
         # Redirect stdout to ensure that print statements/functions
         # won't disrupt the multilang protocol
-        sys.stdout = LogStream(logging.getLogger('streamparse.stdout'))
+        sys.stdout = LogStream(logging.getLogger('pystorm.stdout'))
 
     def read_message(self):
         """Read a message from Storm, reconstruct newlines appropriately.
@@ -399,7 +399,7 @@ class Component(object):
           This will send your message to Storm regardless of what level you
           specify.  In almost all cases, you are better of using
           ``Component.logger`` with a
-          :class:`streamparse.storm.component.StormHandler`, because the
+          :class:`pystorm.component.StormHandler`, because the
           filtering will happen on the Python side (instead of on the Java side
           after taking the time to serialize your message and send it to Storm).
         """
@@ -413,18 +413,18 @@ class Component(object):
 
         :param tup: the Tuple payload to send to Storm, should contain only
                     JSON-serializable data.
-        :type tup: :class:`list` or :class:`streamparse.storm.component.Tuple`
+        :type tup: :class:`list` or :class:`pystorm.component.Tuple`
         :param tup_id: the ID for the Tuple. If omitted by a
-                       :class:`streamparse.storm.spout.Spout`, this emit will be
+                       :class:`pystorm.spout.Spout`, this emit will be
                        unreliable.
         :type tup_id: str
         :param stream: the ID of the stream to emit this Tuple to. Specify
                        ``None`` to emit to default stream.
         :type stream: str
         :param anchors: IDs the Tuples (or
-                        :class:`streamparse.storm.component.Tuple` instances)
+                        :class:`pystorm.component.Tuple` instances)
                         which the emitted Tuples should be anchored to. This is
-                        only passed by :class:`streamparse.storm.bolt.Bolt`.
+                        only passed by :class:`pystorm.bolt.Bolt`.
         :type anchors: list
         :param direct_task: the task to send the Tuple to.
         :type direct_task: int
