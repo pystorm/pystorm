@@ -33,7 +33,8 @@ def readme():
 
 install_requires = [
     'six>=1.5',
-    'simplejson'
+    'simplejson',
+    'msgpack-python'
 ]
 
 if sys.version_info.major < 3:
