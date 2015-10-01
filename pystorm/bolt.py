@@ -63,21 +63,6 @@ class Bolt(Component):
         """ :returns: Whether or not the given Tuple is a tick Tuple """
         return tup.component == '__system' and tup.stream == '__tick'
 
-    def initialize(self, storm_conf, context):
-        """Called immediately after the initial handshake with Storm and before
-        the main run loop. A good place to initialize connections to data
-        sources.
-
-        :param storm_conf: the Storm configuration for this bolt.  This is the
-                           configuration provided to the topology, merged in
-                           with cluster configuration on the worker node.
-        :type storm_conf: dict
-        :param context: information about the component's place within the
-                        topology such as: task IDs, inputs, outputs etc.
-        :type context: dict
-        """
-        pass
-
     def process(self, tup):
         """Process a single Tuple :class:`pystorm.component.Tuple` of
         input

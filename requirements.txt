@@ -1,3 +1,4 @@
 six>=1.5
 setuptools
 simplejson
+msgpack

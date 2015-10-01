@@ -22,21 +22,6 @@ class Spout(Component):
     `Concepts documentation <http://storm.apache.org/documentation/Concepts.html>`_.
     """
 
-    def initialize(self, storm_conf, context):
-        """Called immediately after the initial handshake with Storm and before
-        the main run loop. A good place to initialize connections to data
-        sources.
-
-        :param storm_conf: the Storm configuration for this spout. This is the
-                           configuration provided to the topology, merged in
-                           with cluster configuration on the worker node.
-        :type storm_conf: dict
-        :param context: information about the component's place within the
-                        topology such as: task IDs, inputs, outputs etc.
-        :type context: dict
-        """
-        pass
-
     def ack(self, tup_id):
         """Called when a bolt acknowledges a Tuple in the topology.
 
