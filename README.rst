@@ -39,3 +39,6 @@ Alphabetical, by last name:
    :target: https://travis-ci.org/pystorm/pystorm
 
 .. |logo| image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/logo.png
+   :height: 400px
+   :width: 400px
+   :scale: 50%

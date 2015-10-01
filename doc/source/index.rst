@@ -26,3 +26,6 @@ Indices and tables
 * :ref:`search`
 
 .. |logo| image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/logo.png
+   :height: 400px
+   :width: 400px
+   :scale: 50%
