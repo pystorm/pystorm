@@ -29,5 +29,5 @@ def _safe_int(string):
         return string
 
 
-__version__ = '1.1.0.dev'
+__version__ = '1.0.0'
 VERSION = tuple(_safe_int(x) for x in __version__.split('.'))
