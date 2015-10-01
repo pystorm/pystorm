@@ -1,7 +1,7 @@
 |logo| |Build Status|
 
 Pystorm lets you run Python code against real-time streams of data via
-Apache Storm.  With streamparse you can create Storm bolts and spouts in
+Apache Storm.  With pystorm you can create Storm bolts and spouts in
 Python without having to write a single line of Java.  It is meant to be used
 under-the-hood by Storm Python libraries that will provide the command-line
 tools for actually building/submitting the topologies (e.g.,
