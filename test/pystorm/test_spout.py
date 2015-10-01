@@ -64,47 +64,6 @@ class SpoutTests(unittest.TestCase):
                                                           'task': 'other_spout',
                                                           'id': 'foo'})
 
-
-    @patch.object(Spout, 'send_message', autospec=True)
-    def test_emit_many(self, send_message_mock):
-        # A basic emit
-        self.spout.emit_many([[1, 2, 3], [4, 5, 6]], need_task_ids=False)
-        send_message_mock.assert_has_calls([mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [1, 2, 3],
-                                                       'need_task_ids': False}),
-                                            mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [4, 5, 6],
-                                                       'need_task_ids': False})])
-
-        # Reliable emit
-        send_message_mock.reset_mock()
-        self.spout.emit_many([[1, 2, 3], [4, 5, 6]], tup_ids=['foo', 'bar'],
-                             need_task_ids=False)
-        send_message_mock.assert_has_calls([mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [1, 2, 3],
-                                                       'need_task_ids': False,
-                                                       'id': 'foo'}),
-                                            mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [4, 5, 6],
-                                                       'need_task_ids': False,
-                                                       'id': 'bar'})])
-
-        # Emit as a direct task
-        send_message_mock.reset_mock()
-        self.spout.emit_many([[1, 2, 3], [4, 5, 6]], direct_task='other_spout')
-        send_message_mock.assert_has_calls([mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [1, 2, 3],
-                                                       'task': 'other_spout'}),
-                                            mock.call(self.spout,
-                                                      {'command': 'emit',
-                                                       'tuple': [4, 5, 6],
-                                                       'task': 'other_spout'})])
-
     @patch.object(Spout, 'read_command', autospec=True,
                   return_value={'command': 'ack', 'id': 1234})
     @patch.object(Spout, 'ack', autospec=True)

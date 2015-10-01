@@ -144,45 +144,6 @@ class Bolt(Component):
                                       direct_task=direct_task,
                                       need_task_ids=need_task_ids)
 
-    def emit_many(self, tuples, stream=None, anchors=None, direct_task=None,
-                  need_task_ids=True):
-        """Emit multiple Tuples.
-
-        :param tuples: a ``list`` of multiple Tuple payloads to send to
-                       Storm. All Tuples should contain only
-                       JSON-serializable data.
-        :type tuples: list
-        :param stream: the ID of the steram to emit these Tuples to. Specify
-                       ``None`` to emit to default stream.
-        :type stream: str
-        :param anchors: IDs the Tuples (or :class:`streamparse.storm.component.Tuple`
-                        instances) which the emitted Tuples should be anchored
-                        to. If ``auto_anchor`` is set to ``True`` and
-                        you have not specified ``anchors``, ``anchors`` will be
-                        set to the incoming/most recent Tuple ID(s).
-        :type anchors: list
-        :param direct_task: indicates the task to send the Tuple to.
-        :type direct_task: int
-        :param need_task_ids: indicate whether or not you'd like the task IDs
-                              the Tuple was emitted (default:
-                              ``True``).
-        :type need_task_ids: bool
-
-        .. deprecated:: 2.0.0
-            Just call :py:meth:`Bolt.emit` repeatedly instead.
-        """
-        if not isinstance(tuples, (list, tuple)):
-            raise TypeError('Tuples should be a list of lists/tuples, '
-                            'received {!r} instead.'.format(type(tuples)))
-
-        all_task_ids = []
-        for tup in tuples:
-            all_task_ids.append(self.emit(tup, stream=stream, anchors=anchors,
-                                          direct_task=direct_task,
-                                          need_task_ids=need_task_ids))
-
-        return all_task_ids
-
     def ack(self, tup):
         """Indicate that processing of a Tuple has succeeded.
 
@@ -341,20 +302,6 @@ class BatchingBolt(Bolt):
         """
         kwargs['need_task_ids'] = False
         return super(BatchingBolt, self).emit(tup, **kwargs)
-
-    def emit_many(self, tups, **kwargs):
-        """Modified emit_many that will not return task IDs after emitting.
-
-        See :class:`streamparse.storm.component.Bolt` for more information.
-
-        :returns: ``None``.
-
-        .. deprecated:: 2.0.0
-            Just call :py:meth:`BatchingBolt.emit` repeatedly instead.
-
-        """
-        kwargs['need_task_ids'] = False
-        return super(BatchingBolt, self).emit_many(tups, **kwargs)
 
     def process_tick(self, tick_tup):
         """Increment tick counter, and call ``process_batch`` for all current
