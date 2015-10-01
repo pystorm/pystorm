@@ -18,9 +18,6 @@ Integrates with Apache Storm.
    quickstart
    api
 
-.. image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/quickstart.gif
-
-
 Indices and tables
 ==================
 
