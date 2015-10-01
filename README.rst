@@ -1,4 +1,4 @@
-|Build Status|
+|logo| |Build Status|
 
 Pystorm lets you run Python code against real-time streams of data via
 Apache Storm.  With streamparse you can create Storm bolts and spouts in
@@ -37,3 +37,5 @@ Alphabetical, by last name:
 
 .. |Build Status| image:: https://travis-ci.org/pystorm/pystorm.svg?branch=master
    :target: https://travis-ci.org/pystorm/pystorm
+
+.. |logo| image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/logo.png
