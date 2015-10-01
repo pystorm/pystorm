@@ -15,7 +15,7 @@ install:
 
 # Run test
 script:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.4" ]; then nosetests -v --with-cov --cov streamparse --cov-config .coveragerc --logging-level=DEBUG; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.4" ]; then nosetests -v --with-cov --cov pystorm --cov-config .coveragerc --logging-level=DEBUG; fi
   - if [ $TRAVIS_PYTHON_VERSION != "3.4" ]; then nosetests -v --logging-level=DEBUG; fi
 
 # Calculate coverage on success
