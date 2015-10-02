@@ -1,5 +1,6 @@
 build/
 /build.sh
+.cache
 .coverage
 dist/
 doc/_build/

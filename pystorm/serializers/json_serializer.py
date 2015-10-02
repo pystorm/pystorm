@@ -93,4 +93,5 @@ class JSONSerializer(Serializer):
         serialized = json.dumps(msg_dict)
         if PY2:
             serialized = serialized.decode('utf-8')
+        serialized = '{}\nend\n'.format(serialized)
         return serialized

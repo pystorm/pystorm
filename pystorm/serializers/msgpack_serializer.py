@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import io
 import os
 
 import msgpack
@@ -13,9 +14,18 @@ from .serializer import Serializer
 class MsgpackSerializer(Serializer):
 
     def __init__(self, input_stream, output_stream, reader_lock, writer_lock):
-        super(MsgpackSerializer, self).__init__(input_stream, output_stream,
+        super(MsgpackSerializer, self).__init__(input_stream,
+                                                self._raw_stream(output_stream),
                                                 reader_lock, writer_lock)
-        self._messages = _messages_generator()
+        self._messages = self._messages_generator()
+
+    @staticmethod
+    def _raw_stream(stream):
+        """Returns the raw buffer used by stream, so we can write bytes."""
+        if hasattr(stream, 'buffer'):
+            return stream.buffer
+        else:
+            return stream
 
     def _messages_generator(self):
         unpacker = msgpack.Unpacker()
@@ -24,7 +34,10 @@ class MsgpackSerializer(Serializer):
             # serializer to hang.
             # os.read(fileno, n) will block if there is nothing to read, but will
             # return as soon as it is able to read at most n bytes.
-            line = os.read(self.input_stream.fileno(), 1024 ** 2)
+            try:
+                line = os.read(self.input_stream.fileno(), 1024 ** 2)
+            except io.UnsupportedOperation:
+                line = self.input_stream.read(1024 ** 2)
             if not line:
                 # Handle EOF, which usually means Storm went away
                 raise StormWentAwayError()
