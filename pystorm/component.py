@@ -171,8 +171,6 @@ class Component(object):
                  rdb_signal=signal.SIGUSR1, serializer="json"):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
-        self._reader_lock = RLock()
-        self._writer_lock = RLock()
         self.topology_name = None
         self.task_id = None
         self.component_name = None

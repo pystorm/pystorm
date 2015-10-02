@@ -6,6 +6,7 @@ import io
 import logging
 
 import simplejson as json
+from six import PY2
 
 from ..exceptions import StormWentAwayError
 from .serializer import Serializer
@@ -89,4 +90,7 @@ class JSONSerializer(Serializer):
 
     def serialize_dict(self, msg_dict):
         """Serialize to JSON a message dictionary."""
-        return json.dumps(msg_dict).decode('utf-8')
+        serialized = json.dumps(msg_dict)
+        if PY2:
+            serialized = serialized.decode('utf-8')
+        return serialized

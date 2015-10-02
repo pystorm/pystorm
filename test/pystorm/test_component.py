@@ -80,7 +80,7 @@ class ComponentTests(unittest.TestCase):
         os.remove(pid_path)
         self.assertEqual(given_conf, expected_conf)
         self.assertEqual(given_context, expected_context)
-        self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}),
+        self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}).encode('utf-8'),
                          component.serializer.output_stream.buffer.getvalue())
 
     def test_setup_component(self):
@@ -283,7 +283,7 @@ class ComponentTests(unittest.TestCase):
             component.serializer.output_stream.close()
             component.serializer.output_stream = component.serializer._wrap_stream(BytesIO())
             component.send_message(cmd)
-            self.assertEqual(component.serializer.serialize_dict(cmd),
+            self.assertEqual(component.serializer.serialize_dict(cmd).encode('utf-8'),
                              component.serializer.output_stream.buffer.getvalue())
 
         # Check that we properly skip over invalid input
@@ -300,7 +300,7 @@ class ComponentTests(unittest.TestCase):
             component.serializer.output_stream.close()
             component.serializer.output_stream = component.serializer._wrap_stream(BytesIO())
             component.send_message(cmd)
-            self.assertEqual(component.serializer.serialize_dict(cmd),
+            self.assertEqual(component.serializer.serialize_dict(cmd).encode('utf-8'),
                              component.serializer.output_stream.buffer.getvalue())
 
         # Check that we properly skip over invalid input
