@@ -384,6 +384,21 @@ class Component(object):
         self.send_message({'command': 'error', 'msg': str(message)})
         self.send_message({'command': 'sync'})  # sync up right away
 
+    def report_metric(self, name, value):
+        """Report a custom metric back to Storm.
+
+        :param name:  Name of the metric.  This can be anything.
+        :param value: Value of the metric.  This is usually a number.
+
+        Only supported in Storm 0.9.3+.
+
+        .. note:
+            In order for this to work, the metric must be registered on the
+            Storm side.  See example code
+            `here <https://github.com/dashengju/storm/blob/573c42a64885dac9a6a0d4c69a754500b607a8f1/storm-core/src/jvm/backtype/storm/testing/PythonShellMetricsBolt.java#L22-L23>`__.
+        """
+        self.send_message({'command': 'metrics', 'name': name, 'params': value})
+
     def log(self, message, level=None):
         """Log a message to Storm optionally providing a logging level.
 
