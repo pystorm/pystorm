@@ -11,6 +11,7 @@ from os.path import join
 from threading import RLock
 from traceback import format_exc
 
+from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
 
@@ -460,6 +461,9 @@ class Component(object):
             self.initialize(storm_conf, context)
             while True:
                 self._run()
+        except StormWentAwayError:
+            log.info('Exiting because parent Storm process went away.')
+            sys.exit(2)
         except Exception as e:
             log_msg = "Exception in {}.run()".format(self.__class__.__name__)
             log.error(log_msg, exc_info=True)
