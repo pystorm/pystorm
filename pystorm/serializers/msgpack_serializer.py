@@ -1,4 +1,4 @@
-"""Messagepack implementation of Pyleus serializer"""
+"""Messagepack implementation of pystorm serializer"""
 
 from __future__ import absolute_import, print_function, unicode_literals
 
