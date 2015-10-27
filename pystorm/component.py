@@ -1,7 +1,6 @@
 """Base primititve classes for working with Storm."""
 from __future__ import absolute_import, print_function, unicode_literals
 
-import io
 import logging
 import os
 import signal
@@ -11,8 +10,6 @@ from logging.handlers import RotatingFileHandler
 from os.path import join
 from threading import RLock
 from traceback import format_exc
-
-import simplejson as json
 
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
