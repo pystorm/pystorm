@@ -7,6 +7,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import logging
 import os
 import unittest
+from collections import namedtuple
 from io import BytesIO
 
 import simplejson as json
@@ -24,49 +25,48 @@ log = logging.getLogger(__name__)
 
 
 class ComponentTests(unittest.TestCase):
-
-    def test_read_handshake(self):
-        handshake_dict = {
-            "conf": {
-                "topology.message.timeout.secs": 3,
-                "topology.tick.tuple.freq.secs": 1,
-                "topology.debug": True
-            },
-            "pidDir": ".",
-            "context": {
-                "task->component": {
-                    "1": "example-spout",
-                    "2": "__acker",
-                    "3": "example-bolt1",
-                    "4": "example-bolt2"
-                },
-                "taskid": 3,
-                # Everything below this line is only available in Storm 0.10.0+
-                "componentid": "example-bolt1",
-                "stream->target->grouping": {
-                    "default": {
-                        "example-bolt2": {
-                            "type": "SHUFFLE"
-                        }
-                    }
-                },
-                "streams": ["default"],
-                "stream->outputfields": {"default": ["word"]},
-                "source->stream->grouping": {
-                    "example-spout": {
-                        "default": {
-                            "type": "FIELDS",
-                            "fields": ["word"]
-                        }
-                    }
-                },
-                "source->stream->fields": {
-                    "example-spout": {
-                        "default": ["word"]
-                    }
+    conf = {"topology.message.timeout.secs": 3,
+            "topology.tick.tuple.freq.secs": 1,
+            "topology.debug": True,
+            "topology.name": "foo"}
+    context = {
+        "task->component": {
+            "1": "example-spout",
+            "2": "__acker",
+            "3": "example-bolt1",
+            "4": "example-bolt2"
+        },
+        "taskid": 3,
+        # Everything below this line is only available in Storm 0.11.0+
+        "componentid": "example-bolt1",
+        "stream->target->grouping": {
+            "default": {
+                "example-bolt2": {
+                    "type": "SHUFFLE"
                 }
             }
+        },
+        "streams": ["default"],
+        "stream->outputfields": {"default": ["word"]},
+        "source->stream->grouping": {
+            "example-spout": {
+                "default": {
+                    "type": "FIELDS",
+                    "fields": ["word"]
+                }
+            }
+        },
+        "source->stream->fields": {
+            "example-spout": {
+                "default": ["sentence", "word", "number"]
+            }
         }
+    }
+
+    def test_read_handshake(self):
+        handshake_dict = {"conf": self.conf,
+                          "pidDir": ".",
+                          "context": self.context}
         pid_dir = handshake_dict['pidDir']
         expected_conf = handshake_dict['conf']
         expected_context = handshake_dict['context']
@@ -84,52 +84,18 @@ class ComponentTests(unittest.TestCase):
                          component.serializer.output_stream.buffer.getvalue())
 
     def test_setup_component(self):
-        conf = {"topology.message.timeout.secs": 3,
-                "topology.tick.tuple.freq.secs": 1,
-                "topology.debug": True,
-                "topology.name": "foo"}
-        context = {
-            "task->component": {
-                "1": "example-spout",
-                "2": "__acker",
-                "3": "example-bolt1",
-                "4": "example-bolt2"
-            },
-            "taskid": 3,
-            # Everything below this line is only available in Storm 0.11.0+
-            "componentid": "example-bolt1",
-            "stream->target->grouping": {
-                "default": {
-                    "example-bolt2": {
-                        "type": "SHUFFLE"
-                    }
-                }
-            },
-            "streams": ["default"],
-            "stream->outputfields": {"default": ["word"]},
-            "source->stream->grouping": {
-                "example-spout": {
-                    "default": {
-                        "type": "FIELDS",
-                        "fields": ["word"]
-                    }
-                }
-            },
-            "source->stream->fields": {
-                "example-spout": {
-                    "default": ["word"]
-                }
-            }
-        }
+        conf = self.conf
         component = Component(input_stream=BytesIO(),
                               output_stream=BytesIO())
-        component._setup_component(conf, context)
+        component._setup_component(conf, self.context)
+        self.assertEqual(component._source_tuple_types['example-spout']['default'].__name__,
+                         'Example_SpoutDefaultTuple')
         self.assertEqual(component.topology_name, conf['topology.name'])
-        self.assertEqual(component.task_id, context['taskid'])
+        self.assertEqual(component.task_id, self.context['taskid'])
         self.assertEqual(component.component_name,
-                         context['task->component'][str(context['taskid'])])
+                         self.context['task->component'][str(self.context['taskid'])])
         self.assertEqual(component.storm_conf, conf)
-        self.assertEqual(component.context, context)
+        self.assertEqual(component.context, self.context)
 
     def test_read_message(self):
         inputs = [# Task IDs
@@ -259,7 +225,7 @@ class ComponentTests(unittest.TestCase):
         for msg in inputs[::2]:
             output = json.loads(msg)
             output['component'] = output['comp']
-            output['values'] = output['tuple']
+            output['values'] = tuple(output['tuple'])
             del output['comp']
             del output['tuple']
             outputs.append(Tuple(**output))
@@ -270,6 +236,38 @@ class ComponentTests(unittest.TestCase):
         for output in outputs:
             log.info('Checking Tuple for %r', output)
             tup = component.read_tuple()
+            self.assertEqual(output, tup)
+
+    def test_read_tuple_named_fields(self):
+        # This is only valid for bolts, so we only need to test with task IDs
+        # and Tuples
+        inputs = [('{ "id": "-6955786537413359385", "comp": "example-spout", '
+                   '"stream": "default", "task": 9, "tuple": ["snow white and '
+                   'the seven dwarfs", "field2", 3]}\n'), 'end\n']
+
+        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                              output_stream=BytesIO())
+        component._setup_component(self.conf, self.context)
+
+        Example_SpoutDefaultTuple = namedtuple('Example_SpoutDefaultTuple',
+                                       field_names=['sentence', 'word',
+                                                    'number'])
+
+        outputs = []
+        for msg in inputs[::2]:
+            output = json.loads(msg)
+            output['component'] = output['comp']
+            output['values'] = Example_SpoutDefaultTuple(*output['tuple'])
+            del output['comp']
+            del output['tuple']
+            outputs.append(Tuple(**output))
+
+        for output in outputs:
+            log.info('Checking Tuple for %r', output)
+            tup = component.read_tuple()
+            self.assertEqual(output.values.sentence, tup.values.sentence)
+            self.assertEqual(output.values.word, tup.values.word)
+            self.assertEqual(output.values.number, tup.values.number)
             self.assertEqual(output, tup)
 
     def test_send_message(self):
