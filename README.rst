@@ -33,6 +33,7 @@ Alphabetical, by last name:
 -  Viktor Shlapakov (`@vshlapakov <https://github.com/vshlapakov>`__)
 -  Mike Sukmanowsky (`@msukmanowsky <https://twitter.com/msukmanowsky>`__)
 -  Cody Wilbourn (`@codywilbourn <https://github.com/codywilbourn>`__)
+-  Antonio Uccio Verardi (`@poros <https://github.com/poros>`__)
 -  Curtis Vogt (`@omus <https://github.com/omus>`__)
 
 .. |Build Status| image:: https://travis-ci.org/pystorm/pystorm.svg?branch=master
