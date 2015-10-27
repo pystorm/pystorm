@@ -175,8 +175,6 @@ class Bolt(Component):
 
         Called right before program exits.
         """
-        super(Bolt, self)._handle_run_exception(exc)
-
         if len(self._current_tups) == 1:
             tup = self._current_tups[0]
             self.raise_exception(exc, tup)
@@ -348,8 +346,6 @@ class BatchingBolt(Bolt):
 
         Called right before program exits.
         """
-        # Don't use super here, because Bolt class has own auto fail handling.
-        Component._handle_run_exception(self, exc)
         self.raise_exception(exc, self._current_tups)
 
         if self.auto_fail:
