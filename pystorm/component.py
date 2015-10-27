@@ -464,20 +464,16 @@ class Component(object):
             while True:
                 self._run()
         except Exception as e:
-            self._log_run_exception()
+            log_msg = "Exception in {}.run()".format(self.__class__.__name__)
+            log.error(log_msg, exc_info=True)
             self._handle_run_exception(e)
             sys.exit(1)
 
-    def _log_run_exception(self):
-        """Log an exception encountered whiel running the ``run()`` loop.
-
-        Used by ``_handle_run_exception(exc)``.
-        """
-        log_msg = "Exception in {}.run()".format(self.__class__.__name__)
-        log.error(log_msg, exc_info=True)
-
     def _handle_run_exception(self, exc):
         """Process an exception encountered while running the ``run()`` loop.
+
+        The base implementation just uses ``Component.raise_exception(exc)`` to
+        report the exception bag to Storm.
 
         Called right before program exits.
         """
