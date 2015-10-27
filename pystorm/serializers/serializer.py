@@ -1,5 +1,5 @@
 """Base class for all serialziers used by Storm component. Please note that for
-each serializer a Java counterpart need to be built.
+each serializer a Java counterpart needs to exist.
 """
 
 from __future__ import absolute_import, print_function, unicode_literals
