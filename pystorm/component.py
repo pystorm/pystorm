@@ -14,6 +14,7 @@ from traceback import format_exc
 
 from six import iteritems
 
+from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
 
