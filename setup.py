@@ -33,7 +33,8 @@ def readme():
 
 install_requires = [
     'six>=1.5',
-    'simplejson'
+    'simplejson',
+    'msgpack-python'
 ]
 
 if sys.version_info.major < 3:
@@ -45,14 +46,12 @@ lint_requires = [
 ]
 
 if sys.version_info.major < 3:
-    tests_require = ['mock', 'nose', 'unittest2']
+    tests_require = ['mock', 'pytest', 'unittest2']
 else:
-    tests_require = ['mock', 'nose']
+    tests_require = ['mock', 'pytest']
 
 dependency_links = []
 setup_requires = []
-if 'nosetests' in sys.argv[1:]:
-    setup_requires.append('nose')
 
 setup(
     name='pystorm',
@@ -75,6 +74,5 @@ setup(
     },
     dependency_links=dependency_links,
     zip_safe=False,
-    test_suite='nose.collector',
     include_package_data=True,
 )

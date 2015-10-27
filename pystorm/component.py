@@ -14,6 +14,8 @@ from traceback import format_exc
 
 import simplejson as json
 
+from .serializers.msgpack_serializer import MsgpackSerializer
+from .serializers.json_serializer import JSONSerializer
 
 # Support for Storm Log levels as per STORM-414
 _STORM_LOG_TRACE = 0
@@ -21,24 +23,21 @@ _STORM_LOG_DEBUG = 1
 _STORM_LOG_INFO = 2
 _STORM_LOG_WARN = 3
 _STORM_LOG_ERROR = 4
-_STORM_LOG_LEVELS = {
-    'trace': _STORM_LOG_TRACE,
-    'debug': _STORM_LOG_DEBUG,
-    'info': _STORM_LOG_INFO,
-    'warn': _STORM_LOG_WARN,
-    'warning': _STORM_LOG_WARN,
-    'error': _STORM_LOG_ERROR,
-    'critical': _STORM_LOG_ERROR
-}
-_PYTHON_LOG_LEVELS = {
-    'critical': logging.CRITICAL,
-    'error': logging.ERROR,
-    'warning': logging.WARNING,
-    'warn': logging.WARNING,
-    'info': logging.INFO,
-    'debug': logging.DEBUG,
-    'trace': logging.DEBUG
-}
+_STORM_LOG_LEVELS = {'trace': _STORM_LOG_TRACE,
+                     'debug': _STORM_LOG_DEBUG,
+                     'info': _STORM_LOG_INFO,
+                     'warn': _STORM_LOG_WARN,
+                     'warning': _STORM_LOG_WARN,
+                     'error': _STORM_LOG_ERROR,
+                     'critical': _STORM_LOG_ERROR}
+_PYTHON_LOG_LEVELS = {'critical': logging.CRITICAL,
+                      'error': logging.ERROR,
+                      'warning': logging.WARNING,
+                      'warn': logging.WARNING,
+                      'info': logging.INFO,
+                      'debug': logging.DEBUG,
+                      'trace': logging.DEBUG}
+_SERIALIZERS = {"json": JSONSerializer, "msgpack": MsgpackSerializer}
 
 
 log = logging.getLogger(__name__)
@@ -169,11 +168,9 @@ class Component(object):
 
 
     def __init__(self, input_stream=sys.stdin, output_stream=sys.stdout,
-                 rdb_signal=signal.SIGUSR1):
+                 rdb_signal=signal.SIGUSR1, serializer="json"):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
-        self.input_stream = self._wrap_stream(input_stream)
-        self.output_stream = self._wrap_stream(output_stream)
         self.topology_name = None
         self.task_id = None
         self.component_name = None
@@ -188,6 +185,14 @@ class Component(object):
         self._pending_task_ids = deque()
         self._reader_lock = RLock()
         self._writer_lock = RLock()
+        if serializer in _SERIALIZERS:
+            self.serializer = _SERIALIZERS[serializer](input_stream,
+                                                       output_stream,
+                                                       self._reader_lock,
+                                                       self._writer_lock)
+        else:
+            raise ValueError("Unknown serializer: {0}", serializer)
+
         # Setup remote pdb handler if asked to
         if rdb_signal is not None:
             signal.signal(rdb_signal, remote_pdb_handler)
@@ -196,19 +201,6 @@ class Component(object):
     def is_heartbeat(tup):
         """ :returns: Whether or not the given Tuple is a heartbeat """
         return tup.task == -1 and tup.stream == '__heartbeat'
-
-    @staticmethod
-    def _wrap_stream(stream):
-        """Returns a TextIOWrapper around the given stream that handles UTF-8
-        encoding/decoding.
-        """
-        if hasattr(stream, 'buffer'):
-            return io.TextIOWrapper(stream.buffer, encoding='utf-8')
-        elif hasattr(stream, 'readable'):
-            return io.TextIOWrapper(stream, encoding='utf-8')
-        # Python 2.x stdin and stdout are just files
-        else:
-            return io.open(stream.fileno(), mode=stream.mode, encoding='utf-8')
 
     def _setup_component(self, storm_conf, context):
         """Add helpful instance variables to component after initial handshake
@@ -265,57 +257,8 @@ class Component(object):
         sys.stdout = LogStream(logging.getLogger('pystorm.stdout'))
 
     def read_message(self):
-        """Read a message from Storm, reconstruct newlines appropriately.
-
-        All of Storm's messages (for either bolts or spouts) should be of the
-        form::
-
-            '<command or task_id form prior emit>\\nend\\n'
-
-        Command example, an incoming Tuple to a bolt::
-
-            '{ "id": "-6955786537413359385",  "comp": "1", "stream": "1", "task": 9, "tuple": ["snow white and the seven dwarfs", "field2", 3]}\\nend\\n'
-
-        Command example for a spout to emit its next Tuple::
-
-            '{"command": "next"}\\nend\\n'
-
-        Example, the task IDs a prior emit was sent to::
-
-            '[12, 22, 24]\\nend\\n'
-
-        The edge case of where we read ``''`` from ``input_stream`` indicating
-        EOF, usually means that communication with the supervisor has been
-        severed.
-        """
-        msg = ""
-        num_blank_lines = 0
-        while True:
-            # readline will return trailing \n so that output is unambigious, we
-            # should only have line == '' if we're at EOF
-            with self._reader_lock:
-                line = self.input_stream.readline()
-            if line == 'end\n':
-                break
-            elif line == '':
-                log.error("Received EOF while trying to read stdin from Storm, "
-                           "pipe appears to be broken, exiting.")
-                sys.exit(1)
-            elif line == '\n':
-                num_blank_lines += 1
-                if num_blank_lines % 1000 == 0:
-                    log.warn("While trying to read a command or pending task "
-                             "ID, Storm has instead sent %s '\\n' messages.",
-                             num_blank_lines)
-                continue
-
-            msg = '{}{}\n'.format(msg, line[0:-1])
-
-        try:
-            return json.loads(msg)
-        except Exception:
-            log.error("JSON decode error for message: %r", msg, exc_info=True)
-            raise
+        """Read a message from Storm via serializer."""
+        return self.serializer.read_message()
 
     def read_task_ids(self):
         if self._pending_task_ids:
@@ -359,13 +302,7 @@ class Component(object):
             log.error("%s.%d attempted to send a non dict message to Storm: %r",
                        self.component_name, self.pid, message)
             return
-
-        wrapped_msg = "{}\nend\n".format(json.dumps(message))
-
-        with self._writer_lock:
-            self.output_stream.flush()
-            self.output_stream.write(wrapped_msg)
-            self.output_stream.flush()
+        self.serializer.send_message(message)
 
     def raise_exception(self, exception, tup=None):
         """Report an exception back to Storm via logging.
@@ -483,6 +420,30 @@ class Component(object):
                 return downstream_task_ids
             else:
                 return None
+
+    def _run(self):
+        """The inside of ``run``'s infinite loop.
+
+        Separated out so it can be properly unit tested.
+
+        Must be implemented by sub-class.
+        """
+        raise NotImplementedError
+
+    def initialize(self, storm_conf, context):
+        """Called immediately after the initial handshake with Storm and before
+        the main run loop. A good place to initialize connections to data
+        sources.
+
+        :param storm_conf: the Storm configuration for this component.  This is
+                           the configuration provided to the topology, merged in
+                           with cluster configuration on the worker node.
+        :type storm_conf: dict
+        :param context: information about the component's place within the
+                        topology such as: task IDs, inputs, outputs etc.
+        :type context: dict
+        """
+        pass
 
     def run(self):
         """Main run loop for all components.

@@ -17,6 +17,7 @@ except ImportError:
     from mock import patch
 
 from pystorm import Component, Tuple
+from pystorm.exceptions import StormWentAwayError
 
 
 log = logging.getLogger(__name__)
@@ -79,8 +80,8 @@ class ComponentTests(unittest.TestCase):
         os.remove(pid_path)
         self.assertEqual(given_conf, expected_conf)
         self.assertEqual(given_context, expected_context)
-        self.assertEqual("{}\nend\n".format(json.dumps({"pid": component.pid})).encode('utf-8'),
-                         component.output_stream.buffer.getvalue())
+        self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}).encode('utf-8'),
+                         component.serializer.output_stream.buffer.getvalue())
 
     def test_setup_component(self):
         conf = {"topology.message.timeout.secs": 3,
@@ -146,12 +147,12 @@ class ComponentTests(unittest.TestCase):
         component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
                               output_stream=BytesIO())
         for output in outputs:
-            log.info('Checking msg for %s', output)
+            log.info('Checking msg for %r', output)
             if output:
                 msg = component.read_message()
                 self.assertEqual(output, msg)
             else:
-                with self.assertRaises(SystemExit):
+                with self.assertRaises(StormWentAwayError):
                     component.read_message()
 
     def test_read_message_unicode(self):
@@ -170,12 +171,12 @@ class ComponentTests(unittest.TestCase):
         component = Component(input_stream=BytesIO(''.join(inputs).encode('utf8')),
                               output_stream=BytesIO())
         for output in outputs:
-            log.info('Checking msg for %s', output)
+            log.info('Checking msg for %r', output)
             if output:
                 msg = component.read_message()
                 self.assertEqual(output, msg)
             else:
-                with self.assertRaises(SystemExit):
+                with self.assertRaises(StormWentAwayError):
                     component.read_message()
 
     def test_read_split_message(self):
@@ -210,7 +211,7 @@ class ComponentTests(unittest.TestCase):
         # Skip first output, because it's a task ID, and won't be returned by
         # read_command
         for output in outputs[1:]:
-            log.info('Checking msg for %s', output)
+            log.info('Checking msg for %r', output)
             msg = component.read_command()
             self.assertEqual(output, msg)
         self.assertEqual(component._pending_task_ids.pop(), outputs[0])
@@ -234,7 +235,7 @@ class ComponentTests(unittest.TestCase):
         # Skip middle outputs, because they're commands and won't be returned by
         # read_task_ids
         for output in (outputs[0], outputs[-1]):
-            log.info('Checking msg for %s', output)
+            log.info('Checking msg for %r', output)
             msg = component.read_task_ids()
             self.assertEqual(output, msg)
         for output in outputs[1:-1]:
@@ -267,7 +268,7 @@ class ComponentTests(unittest.TestCase):
                               output_stream=BytesIO())
 
         for output in outputs:
-            log.info('Checking Tuple for %s', output)
+            log.info('Checking Tuple for %r', output)
             tup = component.read_tuple()
             self.assertEqual(output, tup)
 
@@ -279,11 +280,11 @@ class ComponentTests(unittest.TestCase):
                   {"command": "next"},
                   {"command": "sync"}]
         for cmd in inputs:
-            component.output_stream.close()
-            component.output_stream = component._wrap_stream(BytesIO())
+            component.serializer.output_stream.close()
+            component.serializer.output_stream = component.serializer._wrap_stream(BytesIO())
             component.send_message(cmd)
-            self.assertEqual("{}\nend\n".format(json.dumps(cmd)).encode('utf-8'),
-                             component.output_stream.buffer.getvalue())
+            self.assertEqual(component.serializer.serialize_dict(cmd).encode('utf-8'),
+                             component.serializer.output_stream.buffer.getvalue())
 
         # Check that we properly skip over invalid input
         self.assertIsNone(component.send_message(['foo', 'bar']))
@@ -296,11 +297,11 @@ class ComponentTests(unittest.TestCase):
                   {"command": "next"},
                   {"command": "sync"}]
         for cmd in inputs:
-            component.output_stream.close()
-            component.output_stream = component._wrap_stream(BytesIO())
+            component.serializer.output_stream.close()
+            component.serializer.output_stream = component.serializer._wrap_stream(BytesIO())
             component.send_message(cmd)
-            self.assertEqual("{}\nend\n".format(json.dumps(cmd)).encode('utf-8'),
-                             component.output_stream.buffer.getvalue())
+            self.assertEqual(component.serializer.serialize_dict(cmd).encode('utf-8'),
+                             component.serializer.output_stream.buffer.getvalue())
 
         # Check that we properly skip over invalid input
         self.assertIsNone(component.send_message(['foo', 'bar']))
@@ -311,8 +312,8 @@ class ComponentTests(unittest.TestCase):
         inputs = [("I am a robot monkey.", None, 2),
                   ("I am a monkey who learned to talk.", 'warning', 3)]
         for msg, level, storm_level in inputs:
-            component.output_stream.close()
-            component.output_stream = component._wrap_stream(BytesIO())
+            component.serializer.output_stream.close()
+            component.serializer.output_stream = component.serializer._wrap_stream(BytesIO())
             component.log(msg, level=level)
             send_message_mock.assert_called_with(component, {'command': 'log',
                                                              'msg': msg,
