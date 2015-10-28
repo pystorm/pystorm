@@ -34,7 +34,7 @@ class BoltTests(unittest.TestCase):
         tup_json = "{}\nend\n".format(json.dumps(self.tup_dict)).encode('utf-8')
         self.tup = Tuple(self.tup_dict['id'], self.tup_dict['comp'],
                          self.tup_dict['stream'], self.tup_dict['task'],
-                         self.tup_dict['tuple'],)
+                         tuple(self.tup_dict['tuple']),)
         self.bolt = Bolt(input_stream=BytesIO(tup_json),
                          output_stream=BytesIO())
         self.bolt.initialize({}, {})
@@ -190,7 +190,7 @@ class BoltTests(unittest.TestCase):
     def test_heartbeat_response(self, send_message_mock, read_tuple_mock):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id='foo', task=-1,
-                                             stream='__heartbeat', values=[],
+                                             stream='__heartbeat', values=(),
                                              component='__system')
         self.bolt._run()
         send_message_mock.assert_called_with(self.bolt, {'command': 'sync'})
@@ -201,7 +201,7 @@ class BoltTests(unittest.TestCase):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id=None, task=-1,
                                              component='__system',
-                                             stream='__tick', values=[50])
+                                             stream='__tick', values=(50,))
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)
@@ -239,8 +239,8 @@ class BatchingBoltTests(unittest.TestCase):
         tups_json = '\nend\n'.join([json.dumps(tup_dict) for tup_dict in
                                     self.tup_dicts] + [''])
         self.tups = [Tuple(tup_dict['id'], tup_dict['comp'], tup_dict['stream'],
-                           tup_dict['task'], tup_dict['tuple']) for tup_dict in
-                     self.tup_dicts]
+                           tup_dict['task'], tuple(tup_dict['tuple']))
+                     for tup_dict in self.tup_dicts]
         self.nontick_tups = [tup for tup in self.tups if tup.stream != '__tick']
         self.bolt = BatchingBolt(input_stream=BytesIO(tups_json.encode('utf-8')),
                                  output_stream=BytesIO())
@@ -364,7 +364,7 @@ class BatchingBoltTests(unittest.TestCase):
     def test_heartbeat_response(self, send_message_mock, read_tuple_mock):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id='foo', task=-1,
-                                             stream='__heartbeat', values=[],
+                                             stream='__heartbeat', values=(),
                                              component='__system')
         self.bolt._run()
         send_message_mock.assert_called_with(self.bolt, {'command': 'sync'})
@@ -375,7 +375,7 @@ class BatchingBoltTests(unittest.TestCase):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id=None, task=-1,
                                              component='__system',
-                                             stream='__tick', values=[50])
+                                             stream='__tick', values=(50,))
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)

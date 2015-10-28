@@ -3,13 +3,16 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 import os
+import re
 import signal
 import sys
-from collections import deque, namedtuple
+from collections import defaultdict, deque, namedtuple
 from logging.handlers import RotatingFileHandler
 from os.path import join
 from threading import RLock
 from traceback import format_exc
+
+from six import iteritems
 
 from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
@@ -36,6 +39,9 @@ _PYTHON_LOG_LEVELS = {'critical': logging.CRITICAL,
                       'debug': logging.DEBUG,
                       'trace': logging.DEBUG}
 _SERIALIZERS = {"json": JSONSerializer, "msgpack": MsgpackSerializer}
+# Convert names to valid Python identifiers by replacing non-word characters
+# whitespace and leading digits with underscores.
+_IDENTIFIER_RE = re.compile(r'\W|^(?=\d)')
 
 
 log = logging.getLogger(__name__)
@@ -121,7 +127,7 @@ Tuple = namedtuple('Tuple', 'id component stream task values')
 :ivar task: the task the Tuple was generated from.
 :type task: int
 :ivar values: the payload of the Tuple where data is stored.
-:type values: list
+:type values: tuple (or namedtuple for Storm 0.10.0+)
 """
 
 
@@ -177,6 +183,7 @@ class Component(object):
         self.context = None
         self.pid = os.getpid()
         self.logger = None
+        self._source_tuple_types = defaultdict(dict)
         # pending commands/Tuples we read while trying to read task IDs
         self._pending_commands = deque()
         # pending task IDs we read while trying to read commands/Tuples
@@ -207,6 +214,15 @@ class Component(object):
         self.topology_name = storm_conf.get('topology.name', '')
         self.task_id = context.get('taskid', '')
         self.component_name = context.get('componentid')
+        # source->stream->fields requires Storm 0.10.0 or later
+        source_stream_fields = context.get('source->stream->fields', {})
+        for source, stream_fields in iteritems(source_stream_fields):
+            for stream, fields in iteritems(stream_fields):
+                type_name = (_IDENTIFIER_RE.sub('_', source.title()) +
+                             _IDENTIFIER_RE.sub('_', stream.title()) +
+                             'Tuple')
+                self._source_tuple_types[source][stream] = namedtuple(type_name,
+                                                                      fields)
         # If using Storm before 0.10.0 componentid is not available
         if self.component_name is None:
             self.component_name = context.get('task->component', {})\
@@ -280,8 +296,12 @@ class Component(object):
 
     def read_tuple(self):
         cmd = self.read_command()
-        return Tuple(cmd['id'], cmd['comp'], cmd['stream'], cmd['task'],
-                     cmd['tuple'])
+        source = cmd['comp']
+        stream = cmd['stream']
+        values = cmd['tuple']
+        val_type = self._source_tuple_types[source].get(stream)
+        return Tuple(cmd['id'], source, stream, cmd['task'],
+                     tuple(values) if val_type is None else val_type(*values))
 
     def read_handshake(self):
         """Read and process an initial handshake message from Storm."""
