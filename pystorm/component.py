@@ -294,15 +294,6 @@ class Component(object):
                 msg = self.read_message()
             return msg
 
-    def read_tuple(self):
-        cmd = self.read_command()
-        source = cmd['comp']
-        stream = cmd['stream']
-        values = cmd['tuple']
-        val_type = self._source_tuple_types[source].get(stream)
-        return Tuple(cmd['id'], source, stream, cmd['task'],
-                     tuple(values) if val_type is None else val_type(*values))
-
     def read_handshake(self):
         """Read and process an initial handshake message from Storm."""
         msg = self.read_message()

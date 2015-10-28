@@ -6,6 +6,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 import unittest
+from collections import namedtuple
 from io import BytesIO
 
 import simplejson as json
@@ -26,6 +27,43 @@ log = logging.getLogger(__name__)
 class BoltTests(unittest.TestCase):
 
     def setUp(self):
+        self.conf = {"topology.message.timeout.secs": 3,
+                     "topology.tick.tuple.freq.secs": 1,
+                     "topology.debug": True,
+                     "topology.name": "foo"}
+        self.context = {
+            "task->component": {
+                "1": "example-spout",
+                "2": "__acker",
+                "3": "example-bolt1",
+                "4": "example-bolt2"
+            },
+            "taskid": 3,
+            # Everything below this line is only available in Storm 0.11.0+
+            "componentid": "example-bolt1",
+            "stream->target->grouping": {
+                "default": {
+                    "example-bolt2": {
+                        "type": "SHUFFLE"
+                    }
+                }
+            },
+            "streams": ["default"],
+            "stream->outputfields": {"default": ["word"]},
+            "source->stream->grouping": {
+                "example-spout": {
+                    "default": {
+                        "type": "FIELDS",
+                        "fields": ["word"]
+                    }
+                }
+            },
+            "source->stream->fields": {
+                "example-spout": {
+                    "default": ["sentence", "word", "number"]
+                }
+            }
+        }
         self.tup_dict = {'id': 14,
                          'comp': 'some_spout',
                          'stream': 'default',
@@ -37,7 +75,7 @@ class BoltTests(unittest.TestCase):
                          tuple(self.tup_dict['tuple']),)
         self.bolt = Bolt(input_stream=BytesIO(tup_json),
                          output_stream=BytesIO())
-        self.bolt.initialize({}, {})
+        self.bolt.initialize(self.conf, self.context)
 
     @patch.object(Bolt, 'send_message', autospec=True)
     def test_emit_basic(self, send_message_mock):
@@ -205,6 +243,66 @@ class BoltTests(unittest.TestCase):
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)
+
+    def test_read_tuple(self):
+        inputs = [# Tuple with all values
+                  ('{ "id": "-6955786537413359385", "comp": "1", "stream": "1"'
+                   ', "task": 9, "tuple": ["snow white and the seven dwarfs", '
+                   '"field2", 3]}\n'), 'end\n',
+                  # Tick Tuple
+                  ('{ "id": null, "task": -1, "comp": "__system", "stream": '
+                   '"__tick", "tuple": [50]}\n'), 'end\n',
+                  # Heartbeat Tuple
+                  ('{ "id": null, "task": -1, "comp": "__system", "stream": '
+                   '"__heartbeat", "tuple": []}\n'), 'end\n',
+                  ]
+        outputs = []
+        for msg in inputs[::2]:
+            output = json.loads(msg)
+            output['component'] = output['comp']
+            output['values'] = tuple(output['tuple'])
+            del output['comp']
+            del output['tuple']
+            outputs.append(Tuple(**output))
+
+        self.bolt = Bolt(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                         output_stream=BytesIO())
+
+        for output in outputs:
+            log.info('Checking Tuple for %r', output)
+            tup = self.bolt.read_tuple()
+            self.assertEqual(output, tup)
+
+    def test_read_tuple_named_fields(self):
+        inputs = [('{ "id": "-6955786537413359385", "comp": "example-spout", '
+                   '"stream": "default", "task": 9, "tuple": ["snow white and '
+                   'the seven dwarfs", "field2", 3]}\n'), 'end\n']
+
+        Example_SpoutDefaultTuple = namedtuple('Example_SpoutDefaultTuple',
+                                               field_names=['sentence', 'word',
+                                                            'number'])
+
+        self.bolt = Bolt(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                         output_stream=BytesIO())
+        self.bolt._setup_component(self.conf, self.context)
+
+        outputs = []
+        for msg in inputs[::2]:
+            output = json.loads(msg)
+            output['component'] = output['comp']
+            output['values'] = Example_SpoutDefaultTuple(*output['tuple'])
+            del output['comp']
+            del output['tuple']
+            outputs.append(Tuple(**output))
+
+
+        for output in outputs:
+            log.info('Checking Tuple for %r', output)
+            tup = self.bolt.read_tuple()
+            self.assertEqual(output.values.sentence, tup.values.sentence)
+            self.assertEqual(output.values.word, tup.values.word)
+            self.assertEqual(output.values.number, tup.values.number)
+            self.assertEqual(output, tup)
 
 
 class BatchingBoltTests(unittest.TestCase):
@@ -379,7 +477,6 @@ class BatchingBoltTests(unittest.TestCase):
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)
-
 
 
 if __name__ == '__main__':

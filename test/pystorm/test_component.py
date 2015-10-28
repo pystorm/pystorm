@@ -207,69 +207,6 @@ class ComponentTests(unittest.TestCase):
         for output in outputs[1:-1]:
             self.assertEqual(component._pending_commands.popleft(), output)
 
-    def test_read_tuple(self):
-        # This is only valid for bolts, so we only need to test with task IDs
-        # and Tuples
-        inputs = [# Tuple with all values
-                  ('{ "id": "-6955786537413359385", "comp": "1", "stream": "1"'
-                   ', "task": 9, "tuple": ["snow white and the seven dwarfs", '
-                   '"field2", 3]}\n'), 'end\n',
-                  # Tick Tuple
-                  ('{ "id": null, "task": -1, "comp": "__system", "stream": '
-                   '"__tick", "tuple": [50]}\n'), 'end\n',
-                  # Heartbeat Tuple
-                  ('{ "id": null, "task": -1, "comp": "__system", "stream": '
-                   '"__heartbeat", "tuple": []}\n'), 'end\n',
-                  ]
-        outputs = []
-        for msg in inputs[::2]:
-            output = json.loads(msg)
-            output['component'] = output['comp']
-            output['values'] = tuple(output['tuple'])
-            del output['comp']
-            del output['tuple']
-            outputs.append(Tuple(**output))
-
-        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
-                              output_stream=BytesIO())
-
-        for output in outputs:
-            log.info('Checking Tuple for %r', output)
-            tup = component.read_tuple()
-            self.assertEqual(output, tup)
-
-    def test_read_tuple_named_fields(self):
-        # This is only valid for bolts, so we only need to test with task IDs
-        # and Tuples
-        inputs = [('{ "id": "-6955786537413359385", "comp": "example-spout", '
-                   '"stream": "default", "task": 9, "tuple": ["snow white and '
-                   'the seven dwarfs", "field2", 3]}\n'), 'end\n']
-
-        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
-                              output_stream=BytesIO())
-        component._setup_component(self.conf, self.context)
-
-        Example_SpoutDefaultTuple = namedtuple('Example_SpoutDefaultTuple',
-                                       field_names=['sentence', 'word',
-                                                    'number'])
-
-        outputs = []
-        for msg in inputs[::2]:
-            output = json.loads(msg)
-            output['component'] = output['comp']
-            output['values'] = Example_SpoutDefaultTuple(*output['tuple'])
-            del output['comp']
-            del output['tuple']
-            outputs.append(Tuple(**output))
-
-        for output in outputs:
-            log.info('Checking Tuple for %r', output)
-            tup = component.read_tuple()
-            self.assertEqual(output.values.sentence, tup.values.sentence)
-            self.assertEqual(output.values.word, tup.values.word)
-            self.assertEqual(output.values.number, tup.values.number)
-            self.assertEqual(output, tup)
-
     def test_send_message(self):
         component = Component(input_stream=BytesIO(), output_stream=BytesIO())
         inputs = [{"command": "emit", "id": 4, "stream": "", "task": 9,
