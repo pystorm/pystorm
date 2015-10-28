@@ -39,7 +39,8 @@ _PYTHON_LOG_LEVELS = {'critical': logging.CRITICAL,
                       'debug': logging.DEBUG,
                       'trace': logging.DEBUG}
 _SERIALIZERS = {"json": JSONSerializer, "msgpack": MsgpackSerializer}
-# Used for generating namedtuple type names
+# Convert names to valid Python identifiers by replacing non-word characters
+# whitespace and leading digits with underscores.
 _IDENTIFIER_RE = re.compile(r'\W|^(?=\d)')
 
 

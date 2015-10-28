@@ -201,7 +201,7 @@ class BoltTests(unittest.TestCase):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id=None, task=-1,
                                              component='__system',
-                                             stream='__tick', values=(50))
+                                             stream='__tick', values=(50,))
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)
@@ -375,7 +375,7 @@ class BatchingBoltTests(unittest.TestCase):
         # Make sure we send sync for heartbeats
         read_tuple_mock.return_value = Tuple(id=None, task=-1,
                                              component='__system',
-                                             stream='__tick', values=(50))
+                                             stream='__tick', values=(50,))
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt,
                                              read_tuple_mock.return_value)
