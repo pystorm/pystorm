@@ -42,6 +42,14 @@ class Bolt(Component):
     :ivar auto_fail: A ``bool`` indicating whether or not the bolt should
                      automatically fail Tuples when an exception occurs when the
                      ``process()`` method is called. Default is ``True``.
+    :ivar output_fields: Either a ``list`` of field names to be used for the
+                         Tuples emitted on the default stream of this component,
+                         or a ``dict`` mapping from stream names to the lists of
+                         field names for Tuples emitted on those streams.
+
+                         .. note::
+                           This is implemented as a property, so when reading,
+                           it will always return a dictionary, and not a list.
 
     **Example**:
 
@@ -50,6 +58,7 @@ class Bolt(Component):
         from pystorm.bolt import Bolt
 
         class SentenceSplitterBolt(Bolt):
+            output_fields = ['word']
 
             def process(self, tup):
                 sentence = tup.values[0]

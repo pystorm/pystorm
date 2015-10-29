@@ -78,22 +78,27 @@ class ComponentTests(unittest.TestCase):
         pid_path = os.path.join(pid_dir, str(component.pid))
         self.assertTrue(os.path.exists(pid_path))
         os.remove(pid_path)
-        self.assertEqual(given_conf, expected_conf)
-        self.assertEqual(given_context, expected_context)
+        self.assertDictEqual(given_conf, expected_conf)
+        self.assertDictEqual(given_context, expected_context)
         self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}).encode('utf-8'),
                          component.serializer.output_stream.buffer.getvalue())
 
     def test_setup_component(self):
         conf = self.conf
+        context = self.context
         component = Component(input_stream=BytesIO(),
                               output_stream=BytesIO())
-        component._setup_component(conf, self.context)
+        component._setup_component(conf, context)
         self.assertEqual(component.topology_name, conf['topology.name'])
-        self.assertEqual(component.task_id, self.context['taskid'])
+        self.assertEqual(component.task_id, context['taskid'])
         self.assertEqual(component.component_name,
-                         self.context['task->component'][str(self.context['taskid'])])
-        self.assertEqual(component.storm_conf, conf)
-        self.assertEqual(component.context, self.context)
+                         context['task->component'][str(context['taskid'])])
+        self.assertDictEqual(component.storm_conf, conf)
+        self.assertDictEqual(component.context, context)
+        self.assertDictEqual(component.output_fields,
+                             context['stream->outputfields'])
+        self.assertSequenceEqual(component.streams,
+                                 context['stream->outputfields'].keys())
 
     def test_read_message(self):
         inputs = [# Task IDs
