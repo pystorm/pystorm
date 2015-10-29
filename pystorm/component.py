@@ -166,6 +166,14 @@ class Component(object):
                     actually want logged serialized and sent to Storm.
     :ivar serializer: The ``Serializer`` that is used to serialize messages
                       between Storm and Python.
+    :ivar output_fields: Either a ``list`` of field names to be used for the
+                         Tuples emitted on the default stream of this component,
+                         or a ``dict`` mapping from stream names to the lists of
+                         field names for Tuples emitted on those streams.
+
+                         .. note::
+                           This is implemented as a property, so when reading,
+                           it will always return a dictionary, and not a list.
     """
 
 
@@ -181,6 +189,7 @@ class Component(object):
         self.context = None
         self.pid = os.getpid()
         self.logger = None
+        self._output_fields = {}
         # pending commands/Tuples we read while trying to read task IDs
         self._pending_commands = deque()
         # pending task IDs we read while trying to read commands/Tuples
@@ -199,6 +208,27 @@ class Component(object):
         if rdb_signal is not None:
             signal.signal(rdb_signal, remote_pdb_handler)
 
+    @property
+    def output_fields(self):
+        """ A ``dict`` mapping from stream names to the lists of field names for
+            Tuples emitted on those streams. """
+        return self._output_fields
+
+    @output_fields.setter
+    def output_fields(self, value):
+        if isinstance(value, (tuple, list)):
+            self._output_fields = {'default': value}
+        elif isinstance(value, dict):
+            self._output_fields = value
+        else:
+            raise TypeError('output_fields must be either a dict, tuple, or '
+                            'list.  Given: {!r}'.format(value))
+
+    @property
+    def streams(self):
+        """ The output streams for this component. """
+        return self._output_fields.keys()
+
     @staticmethod
     def is_heartbeat(tup):
         """ :returns: Whether or not the given Tuple is a heartbeat """
@@ -211,6 +241,12 @@ class Component(object):
         self.topology_name = storm_conf.get('topology.name', '')
         self.task_id = context.get('taskid', '')
         self.component_name = context.get('componentid')
+        if 'stream->outputfields' in context:
+            context_output_fields = context['stream->outputfields']
+            if self.output_fields:
+                log.info('Replacing output_fields with value from Storm: %s',
+                         context_output_fields)
+            self.output_fields = context_output_fields
         # If using Storm before 0.10.0 componentid is not available
         if self.component_name is None:
             self.component_name = context.get('task->component', {})\

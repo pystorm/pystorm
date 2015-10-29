@@ -20,6 +20,15 @@ class Spout(Component):
 
     For more information on spouts, consult Storm's
     `Concepts documentation <http://storm.apache.org/documentation/Concepts.html>`_.
+
+    :ivar output_fields: Either a ``list`` of field names to be used for the
+                         Tuples emitted on the default stream of this component,
+                         or a ``dict`` mapping from stream names to the lists of
+                         field names for Tuples emitted on those streams.
+
+                         .. note::
+                           This is implemented as a property, so when reading,
+                           it will always return a dictionary, and not a list.
     """
 
     def ack(self, tup_id):
