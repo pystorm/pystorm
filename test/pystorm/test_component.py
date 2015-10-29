@@ -88,8 +88,6 @@ class ComponentTests(unittest.TestCase):
         component = Component(input_stream=BytesIO(),
                               output_stream=BytesIO())
         component._setup_component(conf, self.context)
-        self.assertEqual(component._source_tuple_types['example-spout']['default'].__name__,
-                         'Example_SpoutDefaultTuple')
         self.assertEqual(component.topology_name, conf['topology.name'])
         self.assertEqual(component.task_id, self.context['taskid'])
         self.assertEqual(component.component_name,

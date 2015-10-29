@@ -77,6 +77,12 @@ class BoltTests(unittest.TestCase):
                          output_stream=BytesIO())
         self.bolt.initialize(self.conf, self.context)
 
+    def test_setup_component(self):
+        conf = self.conf
+        self.bolt._setup_component(conf, self.context)
+        self.assertEqual(self.bolt._source_tuple_types['example-spout']['default'].__name__,
+                         'Example_SpoutDefaultTuple')
+
     @patch.object(Bolt, 'send_message', autospec=True)
     def test_emit_basic(self, send_message_mock):
         # A basic emit

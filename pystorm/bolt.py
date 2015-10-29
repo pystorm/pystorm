@@ -3,15 +3,21 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 import os
+import re
 import signal
 import sys
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 from six import iteritems, itervalues, reraise
 
 from .component import Component, Tuple
+
+
+# Convert names to valid Python identifiers by replacing non-word characters
+# whitespace and leading digits with underscores.
+_IDENTIFIER_RE = re.compile(r'\W|^(?=\d)')
 
 
 log = logging.getLogger(__name__)
@@ -57,6 +63,23 @@ class Bolt(Component):
 
     # Using list; Bolt class and subclasses can have more than one current_tup.
     _current_tups = []
+
+    def __init__(self, *args, **kwargs):
+        super(Bolt, self).__init__(*args, **kwargs)
+        self._source_tuple_types = defaultdict(dict)
+
+    def _setup_component(self, storm_conf, context):
+        # See Component._setup_component for docs
+        super(Bolt, self)._setup_component(storm_conf, context)
+        # source->stream->fields requires Storm 0.10.0 or later
+        source_stream_fields = context.get('source->stream->fields', {})
+        for source, stream_fields in iteritems(source_stream_fields):
+            for stream, fields in iteritems(stream_fields):
+                type_name = (_IDENTIFIER_RE.sub('_', source.title()) +
+                             _IDENTIFIER_RE.sub('_', stream.title()) +
+                             'Tuple')
+                self._source_tuple_types[source][stream] = namedtuple(type_name,
+                                                                      fields)
 
     @staticmethod
     def is_tick(tup):
