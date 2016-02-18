@@ -7,7 +7,6 @@ from __future__ import absolute_import, print_function, unicode_literals
 import logging
 import os
 import unittest
-from collections import namedtuple
 from io import BytesIO
 
 import simplejson as json
@@ -17,7 +16,7 @@ try:
 except ImportError:
     from mock import patch
 
-from pystorm import Component, Tuple
+from pystorm import Component
 from pystorm.exceptions import StormWentAwayError
 
 
@@ -251,6 +250,37 @@ class ComponentTests(unittest.TestCase):
             send_message_mock.assert_called_with(component, {'command': 'log',
                                                              'msg': msg,
                                                              'level': storm_level})
+
+    def test_exit_on_exception_true(self):
+        handshake_dict = {"conf": self.conf,
+                          "pidDir": ".",
+                          "context": self.context}
+        inputs = ["{}\n".format(json.dumps(handshake_dict)),
+                  "end\n"]
+        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                              output_stream=BytesIO())
+        with self.assertRaises(SystemExit) as raises_fixture:
+            component.run()
+            assert raises_fixture.exception.value == 1
+
+    @patch.object(Component, '_run', autospec=True)
+    def test_exit_on_exception_false(self, _run_mock):
+        # Make sure _run raises an exception
+        def raiser(self): # lambdas can't raise
+            raise StormWentAwayError if _run_mock.called else NotImplementedError
+        _run_mock.side_effect = raiser
+
+        handshake_dict = {"conf": self.conf,
+                          "pidDir": ".",
+                          "context": self.context}
+        inputs = ["{}\n".format(json.dumps(handshake_dict)),
+                  "end\n"]
+        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                              output_stream=BytesIO())
+        component.exit_on_exception = False
+        with self.assertRaises(SystemExit) as raises_fixture:
+            component.run()
+            assert raises_fixture.exception.value == 2
 
 
 if __name__ == '__main__':

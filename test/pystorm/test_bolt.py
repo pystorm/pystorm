@@ -194,7 +194,6 @@ class BoltTests(unittest.TestCase):
                                                          'tuple': [1, 2, 3],
                                                          'need_task_ids': False})
 
-    @patch('sys.exit', new=lambda r: r)
     @patch.object(Bolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(Bolt, 'fail', autospec=True)
     @patch.object(Bolt, '_run', autospec=True)
@@ -206,11 +205,11 @@ class BoltTests(unittest.TestCase):
         _run_mock.side_effect = raiser
 
         # test auto-fail on (the default)
-        self.bolt.run()
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
         fail_mock.assert_called_with(self.bolt, self.tup)
         self.assertEqual(fail_mock.call_count, 1)
 
-    @patch('sys.exit', new=lambda r: r)
     @patch.object(Bolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(Bolt, 'raise_exception', new=lambda *a: None)
     @patch.object(Bolt, 'fail', autospec=True)
@@ -219,12 +218,14 @@ class BoltTests(unittest.TestCase):
         self.bolt._current_tups = [self.tup]
         # Make sure _run raises an exception
         def raiser(): # lambdas can't raise
+            log.info('Raised borkt')
             raise Exception('borkt')
         _run_mock.side_effect = raiser
 
         # test auto-fail off
         self.bolt.auto_fail = False
-        self.bolt.run()
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
         # Assert that this wasn't called, and print out what it was called with
         # otherwise.
         self.assertListEqual(fail_mock.call_args_list, [])
@@ -403,14 +404,14 @@ class BatchingBoltTests(unittest.TestCase):
 
     @patch.object(BatchingBolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(BatchingBolt, 'raise_exception', new=lambda *a: None)
-    @patch('sys.exit', autospec=True)
     @patch.object(BatchingBolt, 'fail', autospec=True)
-    def test_auto_fail_on(self, fail_mock, exit_mock):
+    def test_auto_fail_on(self, fail_mock):
         # Need to re-register signal handler with mocked version, because
         # mock gets created after handler was originally registered.
         self.setUp()
         # Test auto-fail on (the default)
-        self.bolt.run()
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
 
         # All waiting Tuples should have failed at this point
         fail_mock.assert_has_calls([mock.call(self.bolt, self.nontick_tups[0]),
@@ -418,29 +419,26 @@ class BatchingBoltTests(unittest.TestCase):
                                     mock.call(self.bolt, self.nontick_tups[2])],
                                    any_order=True)
         self.assertEqual(fail_mock.call_count, 3)
-        self.assertEqual(exit_mock.call_count, 1)
 
     @patch.object(BatchingBolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(BatchingBolt, 'raise_exception', new=lambda *a: None)
-    @patch('sys.exit', autospec=True)
     @patch.object(BatchingBolt, 'fail', autospec=True)
-    def test_auto_fail_off(self, fail_mock, exit_mock):
+    def test_auto_fail_off(self, fail_mock):
         # Need to re-register signal handler with mocked version, because
         # mock gets created after handler was originally registered.
         self.setUp()
         # Test auto-fail off
         self.bolt.auto_fail = False
-        self.bolt.run()
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
 
         # All waiting Tuples should have failed at this point
-        self.assertEqual(exit_mock.call_count, 1)
         self.assertListEqual(fail_mock.call_args_list, [])
 
     @patch.object(BatchingBolt, 'read_handshake', new=lambda x: ({}, {}))
-    @patch('sys.exit', autospec=True)
     @patch.object(BatchingBolt, 'process_batch', autospec=True)
     @patch.object(BatchingBolt, 'fail', autospec=True)
-    def test_auto_fail_partial(self, fail_mock, process_batch_mock, exit_mock):
+    def test_auto_fail_partial(self, fail_mock, process_batch_mock):
         # Need to re-register signal handler with mocked version, because
         # mock gets created after handler was originally registered.
         self.setUp()
@@ -456,12 +454,12 @@ class BatchingBoltTests(unittest.TestCase):
                 raise Exception('borkt')
         process_batch_mock.side_effect = work_once
         # Run the batches
-        self.bolt.run()
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
         # Only some Tuples should have failed at this point. The key is that
         # all un-acked Tuples should be failed, even for batches we haven't
         # started processing yet.
         self.assertEqual(fail_mock.call_count, 2)
-        self.assertEqual(exit_mock.call_count, 1)
 
     @patch.object(BatchingBolt, 'read_tuple', autospec=True)
     @patch.object(BatchingBolt, 'send_message', autospec=True)
