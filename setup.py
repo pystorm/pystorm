@@ -45,10 +45,10 @@ lint_requires = [
     'pyflakes'
 ]
 
+tests_require = ['pytest', 'pytest-timeout']
+
 if sys.version_info.major < 3:
-    tests_require = ['mock', 'pytest', 'unittest2']
-else:
-    tests_require = ['mock', 'pytest']
+    tests_require.append('mock')
 
 dependency_links = []
 setup_requires = []
