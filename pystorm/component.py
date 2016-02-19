@@ -11,8 +11,6 @@ from os.path import join
 from threading import RLock
 from traceback import format_exc
 
-from six import iteritems
-
 from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
@@ -166,8 +164,12 @@ class Component(object):
                     actually want logged serialized and sent to Storm.
     :ivar serializer: The ``Serializer`` that is used to serialize messages
                       between Storm and Python.
+    :ivar exit_on_exception:  A ``bool`` indicating whether or not the process
+                              should exit when an exception other than
+                              ``StormWentAwayError`` is raised.  Defaults to
+                              ``True``.
     """
-
+    exit_on_exception = True
 
     def __init__(self, input_stream=sys.stdin, output_stream=sys.stdout,
                  rdb_signal=signal.SIGUSR1, serializer="json"):
@@ -256,7 +258,8 @@ class Component(object):
                                        'path in your config.json.')})
         # Redirect stdout to ensure that print statements/functions
         # won't disrupt the multilang protocol
-        sys.stdout = LogStream(logging.getLogger('pystorm.stdout'))
+        if self.serializer.output_stream == sys.stdout:
+            sys.stdout = LogStream(logging.getLogger('pystorm.stdout'))
 
     def read_message(self):
         """Read a message from Storm via serializer."""
@@ -455,19 +458,19 @@ class Component(object):
         """
         storm_conf, context = self.read_handshake()
         self._setup_component(storm_conf, context)
-
-        try:
-            self.initialize(storm_conf, context)
-            while True:
+        self.initialize(storm_conf, context)
+        while True:
+            try:
                 self._run()
-        except StormWentAwayError:
-            log.info('Exiting because parent Storm process went away.')
-            sys.exit(2)
-        except Exception as e:
-            log_msg = "Exception in {}.run()".format(self.__class__.__name__)
-            log.error(log_msg, exc_info=True)
-            self._handle_run_exception(e)
-            sys.exit(1)
+            except StormWentAwayError:
+                log.info('Exiting because parent Storm process went away.')
+                sys.exit(2)
+            except Exception as e:
+                log_msg = "Exception in {}.run()".format(self.__class__.__name__)
+                log.error(log_msg, exc_info=True)
+                self._handle_run_exception(e)
+                if self.exit_on_exception:
+                    sys.exit(1)
 
     def _handle_run_exception(self, exc):
         """Process an exception encountered while running the ``run()`` loop.
