@@ -67,7 +67,7 @@ Now let's create a bolt that takes in sentences, and spits out words:
                 return
 
             for word in words:
-                self.emit(word)
+                self.emit([word])
             # tuple acknowledgement is handled automatically
 
 The bolt implementation is even simpler. We simply override the default
