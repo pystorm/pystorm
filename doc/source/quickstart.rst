@@ -67,7 +67,7 @@ Now let's create a bolt that takes in sentences, and spits out words:
                 return
 
             for word in words:
-                self.emit(word)
+                self.emit([word])
             # tuple acknowledgement is handled automatically
 
 The bolt implementation is even simpler. We simply override the default
@@ -75,10 +75,6 @@ The bolt implementation is even simpler. We simply override the default
 an incoming spout or bolt. You are welcome to do whatever processing you would
 like in this method and can further emit tuples or not depending on the purpose
 of your bolt.
-
-In the ``SentenceSplitterBolt`` above, we have decided to use the
-``emit_many()`` method instead of ``emit()`` which is a bit more efficient when
-sending a larger number of tuples to Storm.
 
 If your ``process()`` method completes without raising an Exception, pystorm
 will automatically ensure any emits you have are anchored to the current tuple

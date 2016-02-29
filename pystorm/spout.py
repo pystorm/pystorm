@@ -83,48 +83,6 @@ class Spout(Component):
                                        direct_task=direct_task,
                                        need_task_ids=need_task_ids)
 
-    def emit_many(self, tuples, stream=None, tup_ids=None, direct_task=None,
-                  need_task_ids=True):
-        """Emit multiple tuples.
-
-        :param tuples: a ``list`` of multiple Tuple payloads to send to
-                       Storm. All Tuples should contain only
-                       JSON-serializable data.
-        :type tuples: list
-        :param stream: the ID of the stream to emit these Tuples to. Specify
-                       ``None`` to emit to default stream.
-        :type stream: str
-        :param tup_ids: the ID for the Tuple. Leave this blank for an
-                       unreliable emit.
-        :type tup_ids: list
-        :param tup_ids: IDs for each of the Tuples in the list.  Omit these for
-                        an unreliable emit.
-        :type anchors: list
-        :param direct_task: indicates the task to send the Tuple to.
-        :type direct_task: int
-        :param need_task_ids: indicate whether or not you'd like the task IDs
-                              the Tuple was emitted (default:
-                              ``True``).
-        :type need_task_ids: bool
-
-        .. deprecated:: 2.0.0
-            Just call :py:meth:`Spout.emit` repeatedly instead.
-        """
-        if not isinstance(tuples, (list, tuple)):
-            raise TypeError('Tuples should be a list of lists/tuples, '
-                            'received {!r} instead.'.format(type(tuples)))
-
-        all_task_ids = []
-        if tup_ids is None:
-            tup_ids = itertools.repeat(None)
-
-        for tup, tup_id in zip(tuples, tup_ids):
-            all_task_ids.append(self.emit(tup, stream=stream, tup_id=tup_id,
-                                          direct_task=direct_task,
-                                          need_task_ids=need_task_ids))
-
-        return all_task_ids
-
     def _run(self):
         """The inside of ``run``'s infinite loop.
 
