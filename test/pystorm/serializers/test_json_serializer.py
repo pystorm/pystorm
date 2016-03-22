@@ -7,7 +7,9 @@ except ImportError:
     import mock
 
 import simplejson as json
+import pytest
 
+from pystorm.exceptions import StormWentAwayError
 from pystorm.serializers.json_serializer import JSONSerializer
 
 from .serializer import SerializerTestCase
@@ -33,3 +35,12 @@ class TestJSONSerializer(SerializerTestCase):
         self.instance.output_stream = StringIO()
         self.instance.send_message(msg_dict)
         assert self.instance.output_stream.getvalue() == expected_output
+
+    def test_send_message_raises_stormwentaway(self):
+        string_io_mock = mock.MagicMock(autospec=True)
+        def raiser(): # lambdas can't raise
+            raise IOError()
+        string_io_mock.flush.side_effect = raiser
+        self.instance.output_stream = string_io_mock
+        with pytest.raises(StormWentAwayError):
+            self.instance.send_message({'hello': "world",})

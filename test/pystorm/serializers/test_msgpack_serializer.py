@@ -7,7 +7,9 @@ except ImportError:
     import mock
 
 import msgpack
+import pytest
 
+from pystorm.exceptions import StormWentAwayError
 from pystorm.serializers.msgpack_serializer import MsgpackSerializer
 
 from .serializer import SerializerTestCase
@@ -32,3 +34,12 @@ class TestMsgpackSerializer(SerializerTestCase):
         expected_output = msgpack.packb(msg_dict)
         self.instance.send_message(msg_dict)
         assert self.instance.output_stream.getvalue() == expected_output
+
+    def test_send_message_raises_stormwentaway(self):
+        bytes_io_mock = mock.MagicMock(autospec=True)
+        def raiser(): # lambdas can't raise
+            raise IOError()
+        bytes_io_mock.flush.side_effect = raiser
+        self.instance.output_stream = bytes_io_mock
+        with pytest.raises(StormWentAwayError):
+            self.instance.send_message({'hello': "world",})
