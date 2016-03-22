@@ -4,6 +4,8 @@ each serializer a Java counterpart needs to exist.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from ..exceptions import StormWentAwayError
+
 
 class Serializer(object):
 
@@ -21,9 +23,12 @@ class Serializer(object):
     def send_message(self, msg_dict):
         """Serialize a message dictionary and write it to the output stream."""
         with self._writer_lock:
-            self.output_stream.flush()
-            self.output_stream.write(self.serialize_dict(msg_dict))
-            self.output_stream.flush()
+            try:
+                self.output_stream.flush()
+                self.output_stream.write(self.serialize_dict(msg_dict))
+                self.output_stream.flush()
+            except IOError:
+                raise StormWentAwayError()
 
     def serialize_dict(self, msg_dict):
         """Convert a message dictionary to bytes.  Used by send_message"""
