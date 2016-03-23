@@ -12,7 +12,7 @@ from collections import defaultdict, namedtuple
 
 from six import iteritems, itervalues, reraise
 
-from .component import Component, Tuple
+from .component import AsyncComponent, Component, Tuple
 
 
 # Convert names to valid Python identifiers by replacing non-word characters
@@ -224,6 +224,14 @@ class Bolt(Component):
             self.raise_exception(exc, tup)
             if self.auto_fail:
                 self.fail(tup)
+
+
+class AsyncBolt(AsyncComponent, Bolt):
+    """A Bolt that uses separate threads for input, output, and processing.
+
+    This can improve performance in certain situations.
+    """
+    pass
 
 
 class BatchingBolt(Bolt):
@@ -479,7 +487,7 @@ class TicklessBatchingBolt(BatchingBolt):
     def __init__(self, *args, **kwargs):
         super(TicklessBatchingBolt, self).__init__(*args, **kwargs)
         self.exc_info = None
-        signal.signal(signal.SIGUSR1, self._handle_worker_exception)
+        signal.signal(signal.SIGUSR2, self._handle_worker_exception)
 
         iname = self.__class__.__name__
         threading.current_thread().name = "{}:main-thread".format(iname)
@@ -509,12 +517,12 @@ class TicklessBatchingBolt(BatchingBolt):
                 self._batch_entry_run()
         except:
             self.exc_info = sys.exc_info()
-            os.kill(self.pid, signal.SIGUSR1)  # interrupt stdin waiting
+            os.kill(self.pid, signal.SIGUSR2)  # interrupt stdin waiting
 
     def _handle_worker_exception(self, signum, frame):
         """Handle an exception raised in the worker thread.
 
-        Exceptions in the _batcher thread will send a SIGUSR1 to the main
+        Exceptions in the _batcher thread will send a SIGUSR2 to the main
         thread which we catch here, and then raise in the main thread.
         """
         with self._batch_lock:

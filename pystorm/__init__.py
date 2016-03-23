@@ -5,11 +5,12 @@ It is mostly intended to be used by other libraries (e.g., streamparse).
 """
 
 from .component import Component, Tuple
-from .bolt import BatchingBolt, Bolt, TicklessBatchingBolt
-from .spout import ReliableSpout, Spout
-from .version import __version__, VERSION
+from .bolt import AsyncBolt, BatchingBolt, Bolt, TicklessBatchingBolt
+from .spout import AsyncSpout, ReliableSpout, Spout
 
 __all__ = [
+    "AsyncBolt",
+    "AsyncSpout",
     "BatchingBolt",
     "Bolt",
     "Component",

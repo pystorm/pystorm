@@ -13,16 +13,19 @@ import os
 import signal
 import sys
 import threading
+import time
 from collections import deque, namedtuple
 from logging.handlers import RotatingFileHandler
 from os.path import join
 from traceback import format_exc
 
-from six import string_types
+from six import reraise, string_types
+from six.moves.queue import Queue
 
 from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
+
 
 # Support for Storm Log levels as per STORM-414
 _STORM_LOG_TRACE = 0
@@ -508,20 +511,12 @@ class Component(object):
         """
         pass
 
-    def run(self):
+    def _run_loop(self):
         """Main run loop for all components.
 
-        Performs initial handshake with Storm and reads Tuples handing them off
-        to subclasses.  Any exceptions are caught and logged back to Storm
-        prior to the Python process exiting.
-
-        .. warning::
-
-            Subclasses should **not** override this method.
+        Separated out so that we can run this from a thread other than main if
+        we wanted to.
         """
-        storm_conf, context = self.read_handshake()
-        self._setup_component(storm_conf, context)
-        self.initialize(storm_conf, context)
         while True:
             try:
                 self._run()
@@ -548,6 +543,22 @@ class Component(object):
                 if self.exit_on_exception:
                     self._exit(1)
 
+    def run(self):
+        """Initialize component and then start main run loop for this Component.
+
+        Performs initial handshake with Storm and reads Tuples handing them off
+        to subclasses.  Any exceptions are caught and logged back to Storm
+        prior to the Python process exiting.
+
+        .. warning::
+
+            Subclasses should **not** override this method.
+        """
+        storm_conf, context = self.read_handshake()
+        self._setup_component(storm_conf, context)
+        self.initialize(storm_conf, context)
+        self._run_loop()
+
     def _exit(self, status_code):
         """Properly kill Python process including zombie threads."""
         # If there are active threads still running infinite loops, sys.exit
@@ -565,3 +576,98 @@ class Component(object):
         Called right before program exits.
         """
         self.raise_exception(exc)
+
+
+class AsyncComponent(Component):
+    """A Component that uses separate threads for input, output, and processing.
+
+    This can improve performance in certain situations.
+    """
+    def __init__(self, *args, **kwargs):
+        super(AsyncComponent, self).__init__(*args, **kwargs)
+        # Use a Queue instead of a dequeue to store commands and task IDs
+        self._pending_commands = Queue(maxsize=1000)
+        self._pending_task_ids = Queue(maxsize=1000)
+        self._stdout_queue = Queue(maxsize=100)
+        self.exc_info = None
+        signal.signal(signal.SIGUSR2, self._handle_worker_exception)
+
+    def send_message(self, message):
+        """Queue up message to send to on stdout"""
+        self._stdout_queue.put(message)
+
+    def read_task_ids(self):
+        """Pull task IDs from queue"""
+        return self._pending_task_ids.get()
+
+    def read_command(self):
+        """Pull commands and tuples from queue"""
+        return self._pending_commands.get()
+
+    def _reader(self):
+        """Reader thread. Handles reading messages from stdin."""
+        while True:
+            msg = self.read_message()
+            if isinstance(msg, list):
+                self._pending_task_ids.put(msg)
+            else:
+                self._pending_commands.put(msg)
+
+    def _writer(self):
+        """Writer thread. Handles writing messages to stdout."""
+        super_self = super(AsyncComponent, self)
+        for msg in self._stdout_queue:
+            super_self.send_message(msg)
+
+    def _create_worker_thread(self, entry_point):
+        def _thread_wrapper(entry_point):
+            try:
+                while True:
+                    entry_point()
+            except:
+                self.exc_info = sys.exc_info()
+                os.kill(self.pid, signal.SIGUSR2)  # interrupt stdin waiting
+
+        iname = self.__class__.__name__
+        thread = threading.Thread(target=_thread_wrapper(entry_point))
+        thread.name = '{}:_batcher-thread'.format(iname)
+        thread.daemon = True
+        return thread
+
+    def _handle_worker_exception(self, signum, frame):
+        """Handle an exception raised in the worker thread.
+
+        Exceptions in the _batcher thread will send a SIGUSR2 to the main
+        thread which we catch here, and then raise in the main thread.
+        """
+        reraise(*self.exc_info)
+
+    def run(self):
+        """Main run loop for all bolts.
+
+        Performs initial handshake with Storm and reads tuples handing them off
+        to subclasses.  Any exceptions are caught and logged back to Storm
+        prior to the Python process exiting.
+
+        We override run here (which will always advise against) because we want
+        _run to be called repeatedly in a greenlet instead of in the main
+        thread.
+        """
+        storm_conf, context = self.read_handshake()
+        self._setup_component(storm_conf, context)
+        self.initialize(storm_conf, context)
+
+        iname = self.__class__.__name__
+        threading.current_thread().name = '{}:main-thread'.format(iname)
+
+        # Start the various greenlets
+        reader = self._create_worker_thread(self._reader)
+        writer = self._create_worker_thread(self._writer)
+        processor = self._create_worker_thread(self._run_loop)
+        reader.start()
+        writer.start()
+        processor.start()
+
+        # Wait forever, since exceptions will be raised via SIGUSR2
+        while True:
+            time.sleep(0.1)
