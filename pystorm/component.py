@@ -1,6 +1,13 @@
 """Base primititve classes for working with Storm."""
 from __future__ import absolute_import, print_function, unicode_literals
 
+# Monkey patch everything for gevent if provided
+try:
+    from gevent import monkey
+    monkey.patch_all(sys=True)
+except (AttributeError, ImportError):
+    pass
+
 import logging
 import os
 import signal
