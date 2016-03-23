@@ -394,6 +394,7 @@ class Component(object):
                             'received {!r} instead.'.format(type(tup)))
 
         msg = {'command': 'emit', 'tuple': tup}
+        downstream_task_ids = None
 
         if anchors is not None:
             msg['anchors'] = anchors
@@ -403,23 +404,25 @@ class Component(object):
             msg['stream'] = stream
         if direct_task is not None:
             msg['task'] = direct_task
+            if need_task_ids:
+                downstream_task_ids = [direct_task]
 
-        if need_task_ids is False:
+        if not need_task_ids:
             # only need to send on False, Storm's default is True
             msg['need_task_ids'] = need_task_ids
 
-        # Use both locks so we ensure send_message and read_task_ids are for
-        # same emit
-        with self._reader_lock, self._writer_lock:
-            # Message encoding will convert both list and tuple to a JSON array.
+        if need_task_ids and direct_task is None:
+            # Use both locks so we ensure send_message and read_task_ids are for
+            # same emit
+            with self._reader_lock, self._writer_lock:
+                self.send_message(msg)
+                downstream_task_ids = self.read_task_ids()
+        # No locks necessary in simple case because serializer will acquire
+        # write lock itself
+        else:
             self.send_message(msg)
 
-            if need_task_ids is True:
-                downstream_task_ids = [direct_task] if direct_task is not None \
-                                      else self.read_task_ids()
-                return downstream_task_ids
-            else:
-                return None
+        return downstream_task_ids
 
     def _run(self):
         """The inside of ``run``'s infinite loop.
