@@ -225,6 +225,11 @@ class Component(object):
         self.logger = logging.getLogger('.'.join((__name__,
                                                   self.component_name)))
         log_path = self.storm_conf.get('pystorm.log.path')
+        log_file_name = self.storm_conf.get('pystorm.log.file',
+                                            'pystorm_{topology_name}'
+                                            '_{component_name}'
+                                            '_{task_id}'
+                                            '_{pid}.log')
         if log_path:
             root_log = logging.getLogger()
             max_bytes = self.storm_conf.get('pystorm.log.max_bytes',
@@ -232,8 +237,7 @@ class Component(object):
             backup_count = self.storm_conf.get('pystorm.log.backup_count',
                                                10)
             log_file = join(log_path,
-                            ('pystorm_{topology_name}_{component_name}'
-                             '_{task_id}_{pid}.log'
+                            (log_file_name
                              .format(topology_name=self.topology_name,
                                      component_name=self.component_name,
                                      task_id=self.task_id,
