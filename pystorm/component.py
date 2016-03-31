@@ -226,10 +226,10 @@ class Component(object):
                                                   self.component_name)))
         log_path = self.storm_conf.get('pystorm.log.path')
         log_file_name = self.storm_conf.get('pystorm.log.file',
-                                            'pystorm_{d[topology_name]}'
-                                            '_{d[component_name]}'
-                                            '_{d[task_id]}'
-                                            '_{d[pid]}.log')
+                                            'pystorm_{topology_name}'
+                                            '_{component_name}'
+                                            '_{task_id}'
+                                            '_{pid}.log')
         if log_path:
             root_log = logging.getLogger()
             max_bytes = self.storm_conf.get('pystorm.log.max_bytes',
@@ -238,10 +238,10 @@ class Component(object):
                                                10)
             log_file = join(log_path,
                             (log_file_name
-                             .format(d=dict(topology_name=self.topology_name,
+                             .format(topology_name=self.topology_name,
                                      component_name=self.component_name,
                                      task_id=self.task_id,
-                                     pid=self.pid))))
+                                     pid=self.pid)))
             handler = RotatingFileHandler(log_file, maxBytes=max_bytes,
                                           backupCount=backup_count)
             formatter = logging.Formatter('%(asctime)s - %(name)s - '
