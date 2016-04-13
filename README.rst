@@ -1,4 +1,4 @@
-|logo| |Build Status|
+|logo| |Build Status| |Coverage|
 
 Pystorm lets you run Python code against real-time streams of data via
 Apache Storm.  With pystorm you can create Storm bolts and spouts in
@@ -40,3 +40,5 @@ Alphabetical, by last name:
    :target: https://travis-ci.org/pystorm/pystorm
 
 .. |logo| image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/logo.png
+
+.. |Coverage| image:: https://coveralls.io/repos/github/pystorm/pystorm/badge.svg?branch=master :target: https://coveralls.io/github/pystorm/pystorm?branch=master
