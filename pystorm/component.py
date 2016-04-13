@@ -356,7 +356,7 @@ class Component(object):
 
     def read_handshake(self):
         """Read and process an initial handshake message from Storm."""
-        msg = self.read_message()
+        msg = self.read_command()
         pid_dir, _conf, _context = msg["pidDir"], msg["conf"], msg["context"]
 
         # Write a blank PID file out to the pidDir
@@ -606,7 +606,7 @@ class Component(object):
 
         """
 
-        def _thread_wrapper(entry_point):
+        def _thread_wrapper():
             try:
                 while True:
                     entry_point()
@@ -615,7 +615,7 @@ class Component(object):
                 os.kill(self.pid, signal.SIGUSR2)  # interrupt stdin waiting
 
         iname = self.__class__.__name__
-        thread = threading.Thread(target=_thread_wrapper(entry_point))
+        thread = threading.Thread(target=_thread_wrapper)
         thread.name = "{}:{}-thread".format(iname, entry_point.__name__)
         thread.daemon = True
         return thread
@@ -642,6 +642,9 @@ class AsyncComponent(Component):
         self._pending_task_ids = Queue(maxsize=1000)
         self._stdout_queue = Queue(maxsize=100)
         self.exc_info = None
+        self._reader = self._create_worker_thread(self._reader)
+        self._writer = self._create_worker_thread(self._writer)
+        self._processor = self._create_worker_thread(self._run_loop)
 
     def send_message(self, message):
         """Queue up message to send to on stdout"""
@@ -667,7 +670,8 @@ class AsyncComponent(Component):
     def _writer(self):
         """Writer thread. Handles writing messages to stdout."""
         super_self = super(AsyncComponent, self)
-        for msg in self._stdout_queue:
+        while True:
+            msg = self._stdout_queue.get()
             super_self.send_message(msg)
 
     def run(self):
@@ -681,17 +685,14 @@ class AsyncComponent(Component):
         _run to be called repeatedly in a thread/greenlet instead of in the main
         thread.
         """
+        self._reader.start()
+        self._writer.start()
+
         storm_conf, context = self.read_handshake()
         self._setup_component(storm_conf, context)
         self.initialize(storm_conf, context)
 
-        # Start the various greenlets
-        reader = self._create_worker_thread(self._reader)
-        writer = self._create_worker_thread(self._writer)
-        processor = self._create_worker_thread(self._run_loop)
-        reader.start()
-        writer.start()
-        processor.start()
+        self._processor.start()
 
         # Wait forever, since exceptions will be raised via SIGUSR2
         while True:
