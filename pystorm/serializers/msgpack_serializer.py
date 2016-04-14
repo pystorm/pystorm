@@ -13,6 +13,8 @@ from .serializer import Serializer
 
 class MsgpackSerializer(Serializer):
 
+    CHUNK_SIZE = 1024 ** 2
+
     def __init__(self, input_stream, output_stream, reader_lock, writer_lock):
         super(MsgpackSerializer, self).__init__(input_stream,
                                                 self._raw_stream(output_stream),
@@ -34,10 +36,11 @@ class MsgpackSerializer(Serializer):
             # serializer to hang.
             # os.read(fileno, n) will block if there is nothing to read, but will
             # return as soon as it is able to read at most n bytes.
-            try:
-                line = os.read(self.input_stream.fileno(), 1024 ** 2)
-            except io.UnsupportedOperation:
-                line = self.input_stream.read(1024 ** 2)
+            with self._reader_lock:
+                try:
+                    line = os.read(self.input_stream.fileno(), self.CHUNK_SIZE)
+                except io.UnsupportedOperation:
+                    line = self.input_stream.read(self.CHUNK_SIZE)
             if not line:
                 # Handle EOF, which usually means Storm went away
                 raise StormWentAwayError()
