@@ -41,4 +41,5 @@ Alphabetical, by last name:
 
 .. |logo| image:: https://raw.githubusercontent.com/pystorm/pystorm/master/doc/source/images/logo.png
 
-.. |Coverage| image:: https://coveralls.io/repos/github/pystorm/pystorm/badge.svg?branch=master :target: https://coveralls.io/github/pystorm/pystorm?branch=master
+.. |Coverage| image:: https://coveralls.io/repos/github/pystorm/pystorm/badge.svg?branch=master
+   :target: https://coveralls.io/github/pystorm/pystorm?branch=master
