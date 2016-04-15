@@ -57,12 +57,14 @@ def remote_pdb_handler(signum, frame):
 class StormHandler(logging.Handler):
     """Handler that will send messages back to Storm."""
 
-    def __init__(self, stream=None):
-        """ Initialize handler """
-        if stream is None:
-            stream = sys.stdout
+    def __init__(self, serializer):
+        """ Initialize handler
+
+        :param serializer: The serializer of the component this handler is being
+                           used for.
+        """
         super(StormHandler, self).__init__()
-        self._component = Component(output_stream=stream)
+        self.serializer = serializer
 
     def emit(self, record):
         """
@@ -76,7 +78,7 @@ class StormHandler(logging.Handler):
             msg = self.format(record)
             level = _STORM_LOG_LEVELS.get(record.levelname.lower(),
                                           _STORM_LOG_INFO)
-            self._component.send_message({'command': 'log', 'msg': str(msg),
+            self.serializer.send_message({'command': 'log', 'msg': str(msg),
                                           'level': level})
         except Exception:
             self.handleError(record)
@@ -230,8 +232,9 @@ class Component(object):
                                             '_{component_name}'
                                             '_{task_id}'
                                             '_{pid}.log')
+        root_log = logging.getLogger()
+        log_level = self.storm_conf.get('pystorm.log.level', 'info')
         if log_path:
-            root_log = logging.getLogger()
             max_bytes = self.storm_conf.get('pystorm.log.max_bytes',
                                             1000000)  # 1 MB
             backup_count = self.storm_conf.get('pystorm.log.backup_count',
@@ -246,20 +249,21 @@ class Component(object):
                                           backupCount=backup_count)
             formatter = logging.Formatter('%(asctime)s - %(name)s - '
                                           '%(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            root_log.addHandler(handler)
-            log_level = self.storm_conf.get('pystorm.log.level', 'info')
-            log_level = _PYTHON_LOG_LEVELS.get(log_level, logging.INFO)
-            if self.debug:
-                # potentially override logging that was provided if
-                # topology.debug was set to true
-                log_level = logging.DEBUG
-            root_log.setLevel(log_level)
         else:
-            self.send_message({'command': 'log',
-                               'msg': ('WARNING: pystorm logging is not '
-                                       'configured. Please set pystorm.log.'
-                                       'path in your config.json.')})
+            self.log('pystorm StormHandler logging enabled, so all messages at '
+                     'levels greater than "pystorm.log.level" ({}) will be sent'
+                     ' to Storm.'.format(log_level))
+            handler = StormHandler(self.serializer)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
+        log_level = _PYTHON_LOG_LEVELS.get(log_level, logging.INFO)
+        if self.debug:
+            # potentially override logging that was provided if
+            # topology.debug was set to true
+            log_level = logging.DEBUG
+        handler.setLevel(log_level)
+        handler.setFormatter(formatter)
+        root_log.addHandler(handler)
+        self.logger.setLevel(log_level)
         # Redirect stdout to ensure that print statements/functions
         # won't disrupt the multilang protocol
         if self.serializer.output_stream == sys.stdout:
@@ -354,10 +358,10 @@ class Component(object):
 
           This will send your message to Storm regardless of what level you
           specify.  In almost all cases, you are better of using
-          ``Component.logger`` with a
-          :class:`pystorm.component.StormHandler`, because the
-          filtering will happen on the Python side (instead of on the Java side
-          after taking the time to serialize your message and send it to Storm).
+          ``Component.logger`` and not setting ``pystorm.log.path``, because
+          that will use a :class:`pystorm.component.StormHandler` to do the
+          filtering on the Python side (instead of on the Java side after taking
+          the time to serialize your message and send it to Storm).
         """
         level = _STORM_LOG_LEVELS.get(level, _STORM_LOG_INFO)
         self.send_message({'command': 'log', 'msg': str(message),
@@ -474,7 +478,7 @@ class Component(object):
                 sys.exit(2)
             except Exception as e:
                 log_msg = "Exception in {}.run()".format(self.__class__.__name__)
-                log.error(log_msg, exc_info=True)
+                self.logger.error(log_msg, exc_info=True)
                 self._handle_run_exception(e)
                 if self.exit_on_exception:
                     sys.exit(1)
