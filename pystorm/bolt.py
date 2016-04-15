@@ -128,7 +128,7 @@ class Bolt(Component):
         pass
 
     def emit(self, tup, stream=None, anchors=None, direct_task=None,
-             need_task_ids=True):
+             need_task_ids=False):
         """Emit a new Tuple to a stream.
 
         :param tup: the Tuple payload to send to Storm, should contain only
@@ -146,13 +146,13 @@ class Bolt(Component):
         :param direct_task: the task to send the Tuple to.
         :type direct_task: int
         :param need_task_ids: indicate whether or not you'd like the task IDs
-                              the Tuple was emitted (default: ``True``).
+                              the Tuple was emitted (default: ``False``).
         :type need_task_ids: bool
 
-        :returns: a ``list`` of task IDs that the Tuple was sent to. Note that
-                  when specifying direct_task, this will be equal to
-                  ``[direct_task]``. If you specify ``need_task_ids=False``,
-                  this function will return ``None``.
+        :returns: ``None``, unless ``need_task_ids=True``, in which case it will
+                  be a ``list`` of task IDs that the Tuple was sent to if. Note
+                  that when specifying direct_task, this will be equal to
+                  ``[direct_task]``.
         """
         if anchors is None:
             anchors = self._current_tups if self.auto_anchor else []
