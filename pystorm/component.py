@@ -247,14 +247,18 @@ class Component(object):
                                      pid=self.pid)))
             handler = RotatingFileHandler(log_file, maxBytes=max_bytes,
                                           backupCount=backup_count)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                          '%(levelname)s - %(message)s')
+            log_format = self.storm_conf.get('pystorm.log.format',
+                                             '%(asctime)s - %(name)s - '
+                                             '%(levelname)s - %(message)s')
         else:
             self.log('pystorm StormHandler logging enabled, so all messages at '
                      'levels greater than "pystorm.log.level" ({}) will be sent'
                      ' to Storm.'.format(log_level))
             handler = StormHandler(self.serializer)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
+            log_format = self.storm_conf.get('pystorm.log.format',
+                                             '%(asctime)s - %(name)s - '
+                                             '%(message)s')
+        formatter = logging.Formatter(log_format)
         log_level = _PYTHON_LOG_LEVELS.get(log_level, logging.INFO)
         if self.debug:
             # potentially override logging that was provided if
