@@ -110,7 +110,8 @@ class BoltTests(unittest.TestCase):
         send_message_mock.assert_called_with(self.bolt, {'command': 'emit',
                                                          'anchors': [],
                                                          'tuple': [1, 2, 3],
-                                                         'task': 'other_bolt'})
+                                                         'task': 'other_bolt',
+                                                         'need_task_ids': False})
 
     @patch.object(Bolt, 'send_message', autospec=True)
     def test_ack_id(self, send_message_mock):

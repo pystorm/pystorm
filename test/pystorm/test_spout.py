@@ -49,7 +49,8 @@ class SpoutTests(unittest.TestCase):
         self.spout.emit([1, 2, 3], direct_task='other_spout')
         send_message_mock.assert_called_with(self.spout, {'command': 'emit',
                                                           'tuple': [1, 2, 3],
-                                                          'task': 'other_spout'})
+                                                          'task': 'other_spout',
+                                                          'need_task_ids': False})
         # Reliable emit
         self.spout.emit([1, 2, 3], tup_id='foo', need_task_ids=False)
         send_message_mock.assert_called_with(self.spout, {'command': 'emit',
@@ -62,7 +63,8 @@ class SpoutTests(unittest.TestCase):
         send_message_mock.assert_called_with(self.spout, {'command': 'emit',
                                                           'tuple': [1, 2, 3],
                                                           'task': 'other_spout',
-                                                          'id': 'foo'})
+                                                          'id': 'foo',
+                                                          'need_task_ids': False})
 
     @patch.object(Spout, 'read_command', autospec=True,
                   return_value={'command': 'ack', 'id': 1234})
