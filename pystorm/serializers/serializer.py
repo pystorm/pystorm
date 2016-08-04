@@ -4,7 +4,12 @@ each serializer a Java counterpart needs to exist.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import logging
+
 from ..exceptions import StormWentAwayError
+
+
+log = logging.getLogger(__name__)
 
 
 class Serializer(object):
@@ -29,6 +34,8 @@ class Serializer(object):
                 self.output_stream.flush()
             except IOError:
                 raise StormWentAwayError()
+            except:
+                log.exception('Failed to send message: %r', msg_dict)
 
     def serialize_dict(self, msg_dict):
         """Convert a message dictionary to bytes.  Used by send_message"""
