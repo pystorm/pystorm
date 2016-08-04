@@ -268,6 +268,7 @@ class Component(object):
         handler.setFormatter(formatter)
         root_log.addHandler(handler)
         self.logger.setLevel(log_level)
+        logging.getLogger('pystorm').setLevel(log_level)
         # Redirect stdout to ensure that print statements/functions
         # won't disrupt the multilang protocol
         if self.serializer.output_stream == sys.stdout:
