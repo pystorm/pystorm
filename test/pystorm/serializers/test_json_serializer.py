@@ -44,3 +44,10 @@ class TestJSONSerializer(SerializerTestCase):
         self.instance.output_stream = string_io_mock
         with pytest.raises(StormWentAwayError):
             self.instance.send_message({'hello': "world",})
+
+    @mock.patch('pystorm.serializers.serializer.log.exception', autospec=True)
+    def test_send_message_bad_value(self, log_mock):
+        msg_dict = {'hello': b'\xfc\x89'}
+        self.instance.output_stream = StringIO()
+        self.instance.send_message(msg_dict)
+        log_mock.assert_called_with('Failed to send message: %r', msg_dict)
