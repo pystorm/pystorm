@@ -33,7 +33,7 @@ def readme():
 
 install_requires = [
     'six>=1.5',
-    'simplejson',
+    'simplejson>=2.2.0',
     'msgpack-python'
 ]
 

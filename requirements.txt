@@ -1,4 +1,4 @@
 six>=1.5
 setuptools
-simplejson
+simplejson>=2.2.0
 msgpack-python
