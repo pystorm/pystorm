@@ -259,9 +259,10 @@ class ComponentTests(unittest.TestCase):
                   "end\n"]
         component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
                               output_stream=BytesIO())
+        component.exit_on_exception = True
         with self.assertRaises(SystemExit) as raises_fixture:
             component.run()
-            assert raises_fixture.exception.value == 1
+        assert raises_fixture.exception.code == 1
 
     @patch.object(Component, '_run', autospec=True)
     def test_exit_on_exception_false(self, _run_mock):
@@ -280,7 +281,53 @@ class ComponentTests(unittest.TestCase):
         component.exit_on_exception = False
         with self.assertRaises(SystemExit) as raises_fixture:
             component.run()
-            assert raises_fixture.exception.value == 2
+        assert raises_fixture.exception.code == 2
+
+    @patch.object(Component, '_handle_run_exception', autospec=True)
+    @patch('pystorm.component.log', autospec=True)
+    def test_nested_exception(self, log_mock, _handle_run_exception_mock):
+        # Make sure self._handle_run_exception raises an exception
+        def raiser(self): # lambdas can't raise
+            raise Exception('Oops')
+
+        handshake_dict = {"conf": self.conf,
+                          "pidDir": ".",
+                          "context": self.context}
+        inputs = ["{}\n".format(json.dumps(handshake_dict)),
+                  "end\n"]
+        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                              output_stream=BytesIO())
+        component.exit_on_exception = True
+        _handle_run_exception_mock.side_effect = raiser
+
+        with self.assertRaises(SystemExit) as raises_fixture:
+            component.run()
+        assert log_mock.error.call_count == 2
+        assert raises_fixture.exception.code == 1
+
+
+    @patch.object(Component, '_handle_run_exception', autospec=True)
+    @patch('pystorm.component.log', autospec=True)
+    def test_nested_went_away_exception(self, log_mock, _handle_run_exception_mock):
+        # Make sure self._handle_run_exception raises an exception
+        def raiser(*args): # lambdas can't raise
+            raise StormWentAwayError
+
+        handshake_dict = {"conf": self.conf,
+                          "pidDir": ".",
+                          "context": self.context}
+        inputs = ["{}\n".format(json.dumps(handshake_dict)),
+                  "end\n"]
+        component = Component(input_stream=BytesIO(''.join(inputs).encode('utf-8')),
+                              output_stream=BytesIO())
+        component.exit_on_exception = True
+        _handle_run_exception_mock.side_effect = raiser
+
+        with self.assertRaises(SystemExit) as raises_fixture:
+            component.run()
+        assert log_mock.error.call_count == 1
+        assert log_mock.info.call_count == 1
+        assert raises_fixture.exception.code == 2
 
 
 if __name__ == '__main__':
