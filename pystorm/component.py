@@ -484,8 +484,18 @@ class Component(object):
                 sys.exit(2)
             except Exception as e:
                 log_msg = "Exception in {}.run()".format(self.__class__.__name__)
-                self.logger.error(log_msg, exc_info=True)
-                self._handle_run_exception(e)
+                exc_info = sys.exc_info()
+                try:
+                    self.logger.error(log_msg, exc_info=True)
+                    self._handle_run_exception(e)
+                except StormWentAwayError:
+                    log.error(log_msg, exc_info=exc_info)
+                    log.info('Exiting because parent Storm process went away.')
+                    sys.exit(2)
+                except:
+                    log.error(log_msg, exc_info=exc_info)
+                    log.error('While trying to handle previous exception...',
+                              exc_info=sys.exc_info())
                 if self.exit_on_exception:
                     sys.exit(1)
 
