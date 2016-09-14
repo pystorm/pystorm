@@ -161,6 +161,6 @@ class ReliableSpout(Component):
                              'tracked.')
         args = (tup, stream, direct_task, need_task_ids)
         self.unacked_tuples[tup_id] = args
-        super(ReliableSpout, self).emit(tup, tup_id=tup_id, stream=stream,
-                                        direct_task=direct_task,
-                                        need_task_ids=need_task_ids)
+        return super(ReliableSpout, self).emit(tup, tup_id=tup_id, stream=stream,
+                                               direct_task=direct_task,
+                                               need_task_ids=need_task_ids)
