@@ -115,11 +115,10 @@ class ReliableSpout(Component):
                        the topology.
         :type tup_id: str
         """
-        if tup_id in self.failed_tuples:
-            del self.failed_tuples[tup_id]
-        if tup_id in self.unacked_tuples:
+        self.failed_tuples.pop(tup_id, None)
+        try:
             del self.unacked_tuples[tup_id]
-        else:
+        except KeyError:
             self.logger.error('Received ack for unknown tuple ID: %r', tup_id)
 
     def fail(self, tup_id):
