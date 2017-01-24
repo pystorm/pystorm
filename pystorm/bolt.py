@@ -276,6 +276,7 @@ class BatchingBolt(Bolt):
         super(BatchingBolt, self).__init__(*args, **kwargs)
         self._batches = defaultdict(list)
         self._tick_counter = 0
+        self._current_key = None
 
     def group_key(self, tup):
         """Return the group key used to group Tuples within a batch.
@@ -337,12 +338,14 @@ class BatchingBolt(Bolt):
         """
         for key, batch in iteritems(self._batches):
             self._current_tups = batch
+            self._current_key = key
             self.process_batch(key, batch)
             if self.auto_ack:
                 for tup in batch:
                     self.ack(tup)
             # Set current batch to [] so that we know it was acked if a
             # later batch raises an exception
+            self._current_key = None
             self._batches[key] = []
         self._batches = defaultdict(list)
 
@@ -382,14 +385,22 @@ class BatchingBolt(Bolt):
         self.raise_exception(exc, self._current_tups)
 
         if self.auto_fail:
-            # Fail batches
-            for batch in itervalues(self._batches):
-                for tup in batch:
-                    self.fail(tup)
-            # Fail current tick Tuple if we have one
+            failed = set()
+            for key, batch in iteritems(self._batches):
+                # Only wipe out batches other than current for exit_on_exception
+                if self.exit_on_exception or key == self._current_key:
+                    for tup in batch:
+                        self.fail(tup)
+                        failed.add(tup.id)
+
+            # Fail current batch or tick Tuple if we have one
             for tup in self._current_tups:
-                if self.is_tick(tup):
+                if tup.id not in failed:
                     self.fail(tup)
+
+            # Reset current batch info
+            self._batches[self._current_key] = []
+            self._current_key = None
 
 
 class TicklessBatchingBolt(BatchingBolt):
@@ -461,8 +472,7 @@ class TicklessBatchingBolt(BatchingBolt):
 
         iname = self.__class__.__name__
         threading.current_thread().name = '{}:main-thread'.format(iname)
-        self._batches = defaultdict(list)
-        self._batch_lock = threading.Lock()
+        self._batch_lock = threading.RLock()
         self._batcher = threading.Thread(target=self._batch_entry)
         self._batcher.name = '{}:_batcher-thread'.format(iname)
         self._batcher.daemon = True
@@ -496,7 +506,8 @@ class TicklessBatchingBolt(BatchingBolt):
         Exceptions in the _batcher thread will send a SIGUSR1 to the main
         thread which we catch here, and then raise in the main thread.
         """
-        reraise(*self.exc_info)
+        with self._batch_lock:
+            reraise(*self.exc_info)
 
     def _run(self):
         """The inside of ``run``'s infinite loop.
@@ -506,7 +517,7 @@ class TicklessBatchingBolt(BatchingBolt):
         reading the tuple.
 
         We can't acquire the lock before reading the tuple because if
-        that hange (i.e. the topology is shutting down) the lock being
+        that hangs (i.e. the topology is shutting down) the lock being
         acquired will freeze the rest of the bolt, which is precisely
         what this batcher seeks to avoid.
         """
