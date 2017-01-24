@@ -87,6 +87,22 @@ class SpoutTests(unittest.TestCase):
         read_command_mock.assert_called_with(self.spout)
         self.assertEqual(next_tuple_mock.call_count, 1)
 
+    @patch.object(Spout, 'read_command', autospec=True,
+                  return_value={'command': 'activate', 'id': 1234})
+    @patch.object(Spout, 'activate', autospec=True)
+    def test_activate(self, activate_mock, read_command_mock):
+        self.spout._run()
+        read_command_mock.assert_called_with(self.spout)
+        self.assertEqual(activate_mock.call_count, 1)
+
+    @patch.object(Spout, 'read_command', autospec=True,
+                  return_value={'command': 'deactivate', 'id': 1234})
+    @patch.object(Spout, 'deactivate', autospec=True)
+    def test_deactivate(self, deactivate_mock, read_command_mock):
+        self.spout._run()
+        read_command_mock.assert_called_with(self.spout)
+        self.assertEqual(deactivate_mock.call_count, 1)
+
 
 class ReliableSpoutTests(unittest.TestCase):
 
