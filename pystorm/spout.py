@@ -76,6 +76,23 @@ class Spout(Component):
                                        direct_task=direct_task,
                                        need_task_ids=need_task_ids)
 
+    def activate(self):
+        """Called when the Spout has been activated after being deactivated.
+
+        .. note::
+            This requires at least Storm 1.1.0.
+        """
+        pass
+
+
+    def deactivate(self):
+        """Called when the Spout has been deactivated.
+
+        .. note::
+            This requires at least Storm 1.1.0.
+        """
+        pass
+
     def _run(self):
         """The inside of ``run``'s infinite loop.
 
@@ -88,6 +105,10 @@ class Spout(Component):
             self.ack(cmd['id'])
         elif cmd['command'] == 'fail':
             self.fail(cmd['id'])
+        elif cmd['command'] == 'activate':
+            self.activate()
+        elif cmd['command'] == 'deactivate':
+            self.deactivate()
         else:
             self.logger.error('Received invalid command from Storm: %r', cmd)
         self.send_message({'command': 'sync'})
