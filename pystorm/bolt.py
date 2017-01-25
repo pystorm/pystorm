@@ -245,8 +245,15 @@ class BatchingBolt(Bolt):
                      automatically fail Tuples when an exception occurs when the
                      ``process_batch()`` method is called. Default is ``True``.
     :ivar ticks_between_batches: The number of tick Tuples to wait before
-                                 processing a batch.
-
+                                 processing a batch. If either
+                                 ``ticks_between_batches`` or
+                                 ``tuples_between_batches`` are exceeded, a
+                                 batch will be processed.
+    :ivar tuples_between_batches: The number of non-tick Tuples to wait before
+                                  processing a batch.  If either
+                                 ``ticks_between_batches`` or
+                                 ``tuples_between_batches`` are exceeded, a
+                                 batch will be processed.
 
     **Example**:
 
@@ -271,11 +278,13 @@ class BatchingBolt(Bolt):
     auto_ack = True
     auto_fail = True
     ticks_between_batches = 1
+    tuples_between_batches = 1000
 
     def __init__(self, *args, **kwargs):
         super(BatchingBolt, self).__init__(*args, **kwargs)
         self._batches = defaultdict(list)
         self._tick_counter = 0
+        self._tuple_counter = 0
 
     def group_key(self, tup):
         """Return the group key used to group Tuples within a batch.
@@ -311,6 +320,17 @@ class BatchingBolt(Bolt):
         kwargs['need_task_ids'] = False
         return super(BatchingBolt, self).emit(tup, **kwargs)
 
+    def is_batch_ready(self):
+        """Check tick and tuple counters to see if either exceed thresholds."""
+        return (self._batches and
+                (self._tick_counter > self.ticks_between_batches or
+                 self._tuple_counter > self.tuples_between_batches))
+
+    def reset_batch_counters(self):
+        """Called after process_batches to reset tick and tuple counters"""
+        self._tick_counter = 0
+        self._tuple_counter = 0
+
     def process_tick(self, tick_tup):
         """Increment tick counter, and call ``process_batch`` for all current
         batches if tick counter exceeds ``ticks_between_batches``.
@@ -324,9 +344,6 @@ class BatchingBolt(Bolt):
         self._tick_counter += 1
         # ACK tick Tuple immediately, since it's just responsible for counter
         self.ack(tick_tup)
-        if self._tick_counter > self.ticks_between_batches and self._batches:
-            self.process_batches()
-            self._tick_counter = 0
 
     def process_batches(self):
         """Iterate through all batches, call process_batch on them, and ack.
@@ -356,6 +373,7 @@ class BatchingBolt(Bolt):
         # Append latest Tuple to batches
         group_key = self.group_key(tup)
         self._batches[group_key].append(tup)
+        self._tuple_counter += 1
 
     def _run(self):
         """The inside of ``run``'s infinite loop.
@@ -370,6 +388,11 @@ class BatchingBolt(Bolt):
             self.process_tick(tup)
         else:
             self.process(tup)
+        # Process batches if we're ready
+        if self.is_batch_ready():
+            self.process_batches()
+            self.reset_batch_counters()
+
         # reset so that we don't accidentally fail the wrong Tuples
         # if a successive call to read_tuple fails
         self._current_tups = []
