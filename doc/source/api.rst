@@ -37,6 +37,10 @@ emit tuples into streams.
     :inherited-members:
     :show-inheritance:
 
+.. autoclass:: pystorm.spout.ReliableSpout
+    :inherited-members:
+    :show-inheritance:
+
 Bolts
 ^^^^^
 
