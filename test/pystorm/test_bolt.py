@@ -19,6 +19,7 @@ except ImportError:
     from mock import patch
 
 from pystorm import BatchingBolt, Bolt, Tuple
+from pystorm.exceptions import StormWentAwayError
 
 
 log = logging.getLogger(__name__)
@@ -439,13 +440,14 @@ class BatchingBoltTests(unittest.TestCase):
     @patch.object(BatchingBolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(BatchingBolt, 'process_batch', autospec=True)
     @patch.object(BatchingBolt, 'fail', autospec=True)
-    def test_auto_fail_partial(self, fail_mock, process_batch_mock):
+    def test_auto_fail_partial_exit_on_exception_true(self, fail_mock, process_batch_mock):
         # Need to re-register signal handler with mocked version, because
         # mock gets created after handler was originally registered.
         self.setUp()
         # Change the group key just be the sum of values, which makes 3 separate
         # batches
         self.bolt.group_key = lambda t: sum(t.values)
+        self.bolt.exit_on_exception = True
         # Make sure we fail on the second batch
         work = {'status': True} # to avoid scoping problems
         def work_once(*args):
@@ -457,10 +459,39 @@ class BatchingBoltTests(unittest.TestCase):
         # Run the batches
         with self.assertRaises(SystemExit):
             self.bolt.run()
+        self.assertEqual(process_batch_mock.call_count, 2)
         # Only some Tuples should have failed at this point. The key is that
         # all un-acked Tuples should be failed, even for batches we haven't
         # started processing yet.
         self.assertEqual(fail_mock.call_count, 2)
+
+    @patch.object(BatchingBolt, 'read_handshake', new=lambda x: ({}, {}))
+    @patch.object(BatchingBolt, 'process_batch', autospec=True)
+    @patch.object(BatchingBolt, 'fail', autospec=True)
+    def test_auto_fail_partial_exit_on_exception_false(self, fail_mock,
+                                                       process_batch_mock):
+        # Need to re-register signal handler with mocked version, because
+        # mock gets created after handler was originally registered.
+        self.setUp()
+        # Change the group key just be the sum of values, which makes 3 separate
+        # batches
+        self.bolt.group_key = lambda t: sum(t.values)
+        self.bolt.exit_on_exception = False
+        # Make sure we fail on the second batch
+        work = {'status': True, 'raised': False} # to avoid scoping problems
+        def work_once(*args):
+            if work['status']:
+                work['status'] = False
+            else:
+                raise Exception('borkt')
+        process_batch_mock.side_effect = work_once
+        # Run the batches
+        with self.assertRaises(SystemExit) as raises_fixture:
+            self.bolt.run()
+        assert raises_fixture.exception.code == 2
+        self.assertEqual(process_batch_mock.call_count, 2)
+        # Only Tuples in the current batch should have failed at this point.
+        self.assertEqual(fail_mock.call_count, 1)
 
     @patch.object(BatchingBolt, 'read_tuple', autospec=True)
     @patch.object(BatchingBolt, 'send_message', autospec=True)
