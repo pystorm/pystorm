@@ -11,6 +11,8 @@ from os.path import join
 from threading import RLock
 from traceback import format_exc
 
+from six import string_types
+
 from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
@@ -174,7 +176,7 @@ class Component(object):
     exit_on_exception = True
 
     def __init__(self, input_stream=sys.stdin, output_stream=sys.stdout,
-                 rdb_signal=signal.SIGUSR1, serializer="json"):
+                 rdb_signal='SIGUSR1', serializer="json"):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
         self.topology_name = None
@@ -198,6 +200,11 @@ class Component(object):
                                                        self._writer_lock)
         else:
             raise ValueError("Unknown serializer: {0}", serializer)
+
+        # Only default to SIGUSR1 on systems that have it
+        if isinstance(rdb_signal, string_types) and hasattr(signal,
+                                                            rdb_signal):
+            rdb_signal = getattr(signal, rdb_signal)
 
         # Setup remote pdb handler if asked to
         if rdb_signal is not None:
