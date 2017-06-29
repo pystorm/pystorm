@@ -1,17 +1,17 @@
 language: python
 sudo: false
-cache:
-  directories:
-    - $HOME/.cache/pip
+cache: pip
 python:
   - "2.7"
   - "3.3"
   - "3.4"
   - "3.5"
+  - "3.6"
+  - "3.6-dev"
   - "pypy"
 
 install:
-  - travis_retry pip install --upgrade pip
+  - travis_retry pip install --upgrade pip setuptools
   - travis_retry pip install --upgrade pytest python-coveralls coverage pytest-cov pytest-timeout
   - travis_retry pip install -r requirements.txt
   - echo TRAVIS_PYTHON_VERSION=${TRAVIS_PYTHON_VERSION}
@@ -20,9 +20,9 @@ install:
 
 # Run test
 script:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.4" ]; then py.test --cov=pystorm --cov-config .coveragerc --timeout=10; fi
-  - if [ $TRAVIS_PYTHON_VERSION != "3.4" ]; then py.test --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then py.test --cov=pystorm --cov-config .coveragerc --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION != "3.6" ]; then py.test --timeout=10; fi
 
 # Calculate coverage on success
 after_success:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.4" ]; then coveralls --config_file .coveragerc; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then coveralls --config_file .coveragerc; fi
