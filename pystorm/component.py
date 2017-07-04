@@ -5,10 +5,10 @@ import logging
 import os
 import signal
 import sys
+import threading
 from collections import deque, namedtuple
 from logging.handlers import RotatingFileHandler
 from os.path import join
-from threading import RLock
 from traceback import format_exc
 
 from six import string_types
@@ -191,8 +191,8 @@ class Component(object):
         self._pending_commands = deque()
         # pending task IDs we read while trying to read commands/Tuples
         self._pending_task_ids = deque()
-        self._reader_lock = RLock()
-        self._writer_lock = RLock()
+        self._reader_lock = threading.RLock()
+        self._writer_lock = threading.RLock()
         if serializer in _SERIALIZERS:
             self.serializer = _SERIALIZERS[serializer](input_stream,
                                                        output_stream,
@@ -488,7 +488,7 @@ class Component(object):
                 self._run()
             except StormWentAwayError:
                 log.info('Exiting because parent Storm process went away.')
-                sys.exit(2)
+                self._exit(2)
             except Exception as e:
                 log_msg = "Exception in {}.run()".format(self.__class__.__name__)
                 exc_info = sys.exc_info()
@@ -498,13 +498,22 @@ class Component(object):
                 except StormWentAwayError:
                     log.error(log_msg, exc_info=exc_info)
                     log.info('Exiting because parent Storm process went away.')
-                    sys.exit(2)
+                    self._exit(2)
                 except:
                     log.error(log_msg, exc_info=exc_info)
                     log.error('While trying to handle previous exception...',
                               exc_info=sys.exc_info())
+
                 if self.exit_on_exception:
-                    sys.exit(1)
+                    self._exit(1)
+
+    def _exit(self, status_code):
+        """Properly kill Python process including zombie threads."""
+        # If there are active threads still running infinite loops, sys.exit
+        # won't kill them but os._exit will. os._exit skips calling cleanup
+        # handlers, flushing stdio buffers, etc.
+        exit_func = os._exit if threading.active_count() > 1 else sys.exit
+        exit_func(status_code)
 
     def _handle_run_exception(self, exc):
         """Process an exception encountered while running the ``run()`` loop.
