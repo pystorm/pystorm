@@ -35,8 +35,8 @@ install:
 
 # Run test
 script:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then py.test --cov=pystorm --cov-config .coveragerc --timeout=10; fi
-  - if [ $TRAVIS_PYTHON_VERSION != "3.6" ]; then py.test --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then py.test -vv --cov=pystorm --cov-config .coveragerc --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION != "3.6" ]; then py.test -vv --timeout=10; fi
 
 # Calculate coverage on success
 after_success:
