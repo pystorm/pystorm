@@ -6,8 +6,9 @@ try:
     from gevent import monkey
 
     monkey.patch_all(sys=True)
+    GEVENT_MONKEY_PATCHED = True
 except (AttributeError, ImportError):
-    pass
+    GEVENT_MONKEY_PATCHED = False
 
 import logging
 import os
@@ -250,6 +251,9 @@ class Component(object):
         self.exception_signal = exception_signal
         if self.exception_signal is not None:
             signal.signal(self.exception_signal, self._handle_worker_exception)
+        else:
+            self.logger.warning('Leaving exception_signal unset will make your '
+                                'component hang if it hits a worker exception.')
         iname = self.__class__.__name__
         threading.current_thread().name = "{}:main-thread".format(iname)
 
@@ -603,7 +607,7 @@ class Component(object):
 
         This is a separate function so that all worker threads will raise
         SIGUSR2 when something goes wrong so that exceptions will be handled by
-
+        ``Component._handle_worker_exception``.
         """
 
         def _thread_wrapper():
@@ -612,7 +616,7 @@ class Component(object):
                     entry_point()
             except:
                 self.exc_info = sys.exc_info()
-                os.kill(self.pid, signal.SIGUSR2)  # interrupt stdin waiting
+                os.kill(self.pid, self.exception_signal)  # interrupt stdin waiting
 
         iname = self.__class__.__name__
         thread = threading.Thread(target=_thread_wrapper)
@@ -637,6 +641,11 @@ class AsyncComponent(Component):
 
     def __init__(self, *args, **kwargs):
         super(AsyncComponent, self).__init__(*args, **kwargs)
+        # If we don't have gevent, these will not work
+        if not GEVENT_MONKEY_PATCHED:
+            raise RuntimeError('AsyncComponent requires gevent. '
+                               'You probably want to run `pip install gevent`.')
+
         # Use a Queue instead of a dequeue to store commands and task IDs
         self._pending_commands = Queue(maxsize=1000)
         self._pending_task_ids = Queue(maxsize=1000)
@@ -681,7 +690,7 @@ class AsyncComponent(Component):
         to subclasses.  Any exceptions are caught and logged back to Storm
         prior to the Python process exiting.
 
-        We override run here (which will always advise against) because we want
+        We override run here (which we always advise against) because we want
         _run to be called repeatedly in a thread/greenlet instead of in the main
         thread.
         """
