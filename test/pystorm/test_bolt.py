@@ -20,7 +20,6 @@ except ImportError:
     from mock import patch
 
 from pystorm import AsyncBolt, BatchingBolt, Bolt, Tuple
-from pystorm.component import GEVENT_MONKEY_PATCHED
 
 
 log = logging.getLogger(__name__)
@@ -638,6 +637,9 @@ class AsyncBoltTests(unittest.TestCase):
         self.bolt = AsyncBolt(input_stream=BytesIO(tup_json),
                               output_stream=BytesIO())
         self.bolt.initialize(self.conf, self.context)
+
+    def tearDown(self):
+        self.bolt.stop()
 
     def test_setup_component(self):
         conf = self.conf

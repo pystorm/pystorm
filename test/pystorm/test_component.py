@@ -488,10 +488,16 @@ class AsyncComponentTests(unittest.TestCase):
         os.remove(pid_path)
         self.assertEqual(given_conf, expected_conf)
         self.assertEqual(given_context, expected_context)
+<<<<<<< HEAD
         self.assertEqual(
             component.serializer.serialize_dict({"pid": component.pid}).encode("utf-8"),
             component.serializer.output_stream.buffer.getvalue(),
         )
+=======
+        self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}).encode('utf-8'),
+                         component.serializer.output_stream.buffer.getvalue())
+        component.stop()
+>>>>>>> Replace while True with while not self._stopped to make thread stoppable
 
     def test_setup_component(self):
         conf = self.conf
@@ -540,6 +546,7 @@ class AsyncComponentTests(unittest.TestCase):
             else:
                 with self.assertRaises(StormWentAwayError):
                     component.read_message()
+        component.stop()
 
     def test_read_message_unicode(self):
         inputs = [  # Task IDs
@@ -575,6 +582,7 @@ class AsyncComponentTests(unittest.TestCase):
             else:
                 with self.assertRaises(StormWentAwayError):
                     component.read_message()
+        component.stop()
 
     def test_read_split_message(self):
         # Make sure we can read something that's broken up into many "lines"
@@ -595,6 +603,7 @@ class AsyncComponentTests(unittest.TestCase):
         component._reader.start()
         msg = component.read_message()
         self.assertEqual(output, msg)
+        component.stop()
 
     def test_read_command(self):
         # Check that we properly queue task IDs and return only commands
@@ -626,6 +635,7 @@ class AsyncComponentTests(unittest.TestCase):
             msg = component.read_command()
             self.assertEqual(output, msg)
         self.assertEqual(component._pending_task_ids.get(), outputs[0])
+        component.stop()
 
     def test_read_task_ids(self):
         # Check that we properly queue commands and return only task IDs
@@ -661,6 +671,7 @@ class AsyncComponentTests(unittest.TestCase):
             self.assertEqual(output, msg)
         for output in outputs[1:-1]:
             self.assertEqual(component._pending_commands.get(), output)
+        component.stop()
 
     def test_send_message(self):
         component = AsyncComponent(
@@ -692,7 +703,12 @@ class AsyncComponentTests(unittest.TestCase):
             )
 
         # Check that we properly skip over invalid input
+<<<<<<< HEAD
         self.assertIsNone(component.send_message(["foo", "bar"]))
+=======
+        self.assertIsNone(component.send_message(['foo', 'bar']))
+        component.stop()
+>>>>>>> Replace while True with while not self._stopped to make thread stoppable
 
     def test_send_message_unicode(self):
         component = AsyncComponent(
@@ -724,7 +740,8 @@ class AsyncComponentTests(unittest.TestCase):
             )
 
         # Check that we properly skip over invalid input
-        self.assertIsNone(component.send_message(["foo", "bar"]))
+        self.assertIsNone(component.send_message(['foo', 'bar']))
+        component.stop()
 
     @patch.object(AsyncComponent, "send_message", autospec=True)
     def test_log(self, send_message_mock):
@@ -743,9 +760,10 @@ class AsyncComponentTests(unittest.TestCase):
                 BlockingBytesIO()
             )
             component.log(msg, level=level)
-            send_message_mock.assert_called_with(
-                component, {"command": "log", "msg": msg, "level": storm_level}
-            )
+            send_message_mock.assert_called_with(component, {'command': 'log',
+                                                             'msg': msg,
+                                                             'level': storm_level})
+        component.stop()
 
     @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
     def test_exit_on_exception_true(self):
@@ -758,6 +776,7 @@ class AsyncComponentTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raises_fixture:
             component.run()
             assert raises_fixture.exception.value == 1
+        component.stop()
 
     @patch.object(AsyncComponent, '_run', autospec=True)
     @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
@@ -778,6 +797,7 @@ class AsyncComponentTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raises_fixture:
             component.run()
             assert raises_fixture.exception.value == 2
+        component.stop()
 
 
 if __name__ == "__main__":
