@@ -6,9 +6,8 @@ try:
     from gevent import monkey
 
     monkey.patch_all(sys=True)
-    GEVENT_MONKEY_PATCHED = True
 except (AttributeError, ImportError):
-    GEVENT_MONKEY_PATCHED = False
+    pass
 
 import logging
 import os
@@ -606,8 +605,8 @@ class Component(object):
         """Create a daemon worker thread that will run a function.
 
         This is a separate function so that all worker threads will raise
-        SIGUSR2 when something goes wrong so that exceptions will be handled by
-        ``Component._handle_worker_exception``.
+        ``self.exception_signal`` when something goes wrong so that exceptions
+        will be handled by ``Component._handle_worker_exception``.
         """
 
         def _thread_wrapper():
@@ -641,11 +640,6 @@ class AsyncComponent(Component):
 
     def __init__(self, *args, **kwargs):
         super(AsyncComponent, self).__init__(*args, **kwargs)
-        # If we don't have gevent, these will not work
-        if not GEVENT_MONKEY_PATCHED:
-            raise RuntimeError('AsyncComponent requires gevent. '
-                               'You probably want to run `pip install gevent`.')
-
         # Use a Queue instead of a dequeue to store commands and task IDs
         self._pending_commands = Queue(maxsize=1000)
         self._pending_task_ids = Queue(maxsize=1000)

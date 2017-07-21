@@ -14,11 +14,13 @@ except (AttributeError, ImportError):
 
 import logging
 import os
+import sys
 import time
 import unittest
 from io import BytesIO
 
 import simplejson as json
+import pytest
 
 try:
     from unittest.mock import patch
@@ -372,7 +374,12 @@ class ComponentTests(unittest.TestCase):
             component.run()
         assert raises_fixture.exception.code == 1
 
+<<<<<<< HEAD
     @patch.object(Component, "_run", autospec=True)
+=======
+    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
+    @patch.object(Component, '_run', autospec=True)
+>>>>>>> Try to fix some async test failures
     def test_exit_on_exception_false(self, _run_mock):
         # Make sure _run raises an exception
         def raiser(self):  # lambdas can't raise
@@ -740,6 +747,7 @@ class AsyncComponentTests(unittest.TestCase):
                 component, {"command": "log", "msg": msg, "level": storm_level}
             )
 
+    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
     def test_exit_on_exception_true(self):
         handshake_dict = {"conf": self.conf, "pidDir": ".", "context": self.context}
         inputs = ["{}\n".format(json.dumps(handshake_dict)), "end\n"]
@@ -751,7 +759,8 @@ class AsyncComponentTests(unittest.TestCase):
             component.run()
             assert raises_fixture.exception.value == 1
 
-    @patch.object(AsyncComponent, "_run", autospec=True)
+    @patch.object(AsyncComponent, '_run', autospec=True)
+    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
     def test_exit_on_exception_false(self, _run_mock):
         # Make sure _run raises an exception
         def raiser(self):  # lambdas can't raise

@@ -10,6 +10,7 @@ from collections import namedtuple
 from io import BytesIO
 
 import simplejson as json
+import pytest
 
 try:
     from unittest import mock
@@ -19,6 +20,7 @@ except ImportError:
     from mock import patch
 
 from pystorm import AsyncBolt, BatchingBolt, Bolt, Tuple
+from pystorm.component import GEVENT_MONKEY_PATCHED
 
 
 log = logging.getLogger(__name__)
@@ -757,6 +759,7 @@ class AsyncBoltTests(unittest.TestCase):
     @patch.object(AsyncBolt, 'read_handshake', new=lambda x: ({}, {}))
     @patch.object(AsyncBolt, 'fail', autospec=True)
     @patch.object(AsyncBolt, '_run', autospec=True)
+    @patch.object(AsyncBolt, '_exit', new=lambda self, code: sys.exit(code))
     def test_auto_fail_on(self, _run_mock, fail_mock):
         self.bolt._current_tups = [self.tup]
         # Make sure _run raises an exception
@@ -774,6 +777,7 @@ class AsyncBoltTests(unittest.TestCase):
     @patch.object(AsyncBolt, 'raise_exception', new=lambda *a: None)
     @patch.object(AsyncBolt, 'fail', autospec=True)
     @patch.object(AsyncBolt, '_run', autospec=True)
+    @patch.object(AsyncBolt, '_exit', new=lambda self, code: sys.exit(code))
     def test_auto_fail_off(self, _run_mock, fail_mock):
         self.bolt._current_tups = [self.tup]
         # Make sure _run raises an exception
