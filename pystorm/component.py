@@ -252,8 +252,10 @@ class Component(object):
         if self.exception_signal is not None:
             signal.signal(self.exception_signal, self._handle_worker_exception)
         else:
-            self.logger.warning('Leaving exception_signal unset will make your '
-                                'component hang if it hits a worker exception.')
+            self.logger.warning(
+                "Leaving exception_signal unset will make your "
+                "component hang if it hits a worker exception."
+            )
         iname = self.__class__.__name__
         threading.current_thread().name = "{}:main-thread".format(iname)
 
@@ -722,6 +724,6 @@ class AsyncComponent(Component):
         """
         super(AsyncComponent, self).stop()
         # Join to stop threads when we're not running anymore
-        self._reader.join()
-        self._writer.join()
-        self._processor.join()
+        for thread in (self._reader, self._writer, self._processor):
+            if thread.is_alive():
+                thread.join()

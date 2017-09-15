@@ -20,7 +20,6 @@ import unittest
 from io import BytesIO
 
 import simplejson as json
-import pytest
 
 try:
     from unittest.mock import patch
@@ -374,12 +373,8 @@ class ComponentTests(unittest.TestCase):
             component.run()
         assert raises_fixture.exception.code == 1
 
-<<<<<<< HEAD
+    @patch.object(Component, "_exit", new=lambda self, code: sys.exit(code))
     @patch.object(Component, "_run", autospec=True)
-=======
-    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
-    @patch.object(Component, '_run', autospec=True)
->>>>>>> Try to fix some async test failures
     def test_exit_on_exception_false(self, _run_mock):
         # Make sure _run raises an exception
         def raiser(self):  # lambdas can't raise
@@ -478,7 +473,7 @@ class AsyncComponentTests(unittest.TestCase):
         inputs = ["{}\n".format(json.dumps(handshake_dict)), "end\n"]
         component = AsyncComponent(
             input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            output_stream=BytesIO(),
         )
         component._reader.start()
         component._writer.start()
@@ -488,16 +483,11 @@ class AsyncComponentTests(unittest.TestCase):
         os.remove(pid_path)
         self.assertEqual(given_conf, expected_conf)
         self.assertEqual(given_context, expected_context)
-<<<<<<< HEAD
         self.assertEqual(
             component.serializer.serialize_dict({"pid": component.pid}).encode("utf-8"),
             component.serializer.output_stream.buffer.getvalue(),
         )
-=======
-        self.assertEqual(component.serializer.serialize_dict({"pid": component.pid}).encode('utf-8'),
-                         component.serializer.output_stream.buffer.getvalue())
         component.stop()
->>>>>>> Replace while True with while not self._stopped to make thread stoppable
 
     def test_setup_component(self):
         conf = self.conf
@@ -537,7 +527,6 @@ class AsyncComponentTests(unittest.TestCase):
             output_stream=BlockingBytesIO(),
         )
         component._reader.start()
-        component._writer.start()
         for output in outputs:
             log.info("Checking msg for %r", output)
             if output:
@@ -546,7 +535,6 @@ class AsyncComponentTests(unittest.TestCase):
             else:
                 with self.assertRaises(StormWentAwayError):
                     component.read_message()
-        component.stop()
 
     def test_read_message_unicode(self):
         inputs = [  # Task IDs
@@ -569,11 +557,9 @@ class AsyncComponentTests(unittest.TestCase):
         outputs = [json.loads(msg) for msg in inputs[::2] if msg]
         outputs.append("")
         component = AsyncComponent(
-            input_stream=BlockingBytesIO("".join(inputs).encode("utf8")),
-            output_stream=BlockingBytesIO(),
+            input_stream=BytesIO("".join(inputs).encode("utf8")),
+            output_stream=BytesIO(),
         )
-        component._reader.start()
-        component._writer.start()
         for output in outputs:
             log.info("Checking msg for %r", output)
             if output:
@@ -582,7 +568,6 @@ class AsyncComponentTests(unittest.TestCase):
             else:
                 with self.assertRaises(StormWentAwayError):
                     component.read_message()
-        component.stop()
 
     def test_read_split_message(self):
         # Make sure we can read something that's broken up into many "lines"
@@ -597,13 +582,11 @@ class AsyncComponentTests(unittest.TestCase):
         output = json.loads("".join(inputs[:-1]))
 
         component = AsyncComponent(
-            input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            input_stream=BytesIO("".join(inputs).encode("utf-8")),
+            output_stream=BytesIO(),
         )
-        component._reader.start()
         msg = component.read_message()
         self.assertEqual(output, msg)
-        component.stop()
 
     def test_read_command(self):
         # Check that we properly queue task IDs and return only commands
@@ -624,7 +607,7 @@ class AsyncComponentTests(unittest.TestCase):
         outputs = [json.loads(msg) for msg in inputs[::2]]
         component = AsyncComponent(
             input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            output_stream=BytesIO(),
         )
         component._reader.start()
 
@@ -659,7 +642,7 @@ class AsyncComponentTests(unittest.TestCase):
         outputs = [json.loads(msg) for msg in inputs[::2]]
         component = AsyncComponent(
             input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            output_stream=BytesIO(),
         )
         component._reader.start()
 
@@ -675,7 +658,7 @@ class AsyncComponentTests(unittest.TestCase):
 
     def test_send_message(self):
         component = AsyncComponent(
-            input_stream=BlockingBytesIO(), output_stream=BlockingBytesIO()
+            input_stream=BlockingBytesIO(), output_stream=BytesIO()
         )
         component._reader.start()
         component._writer.start()
@@ -703,16 +686,12 @@ class AsyncComponentTests(unittest.TestCase):
             )
 
         # Check that we properly skip over invalid input
-<<<<<<< HEAD
         self.assertIsNone(component.send_message(["foo", "bar"]))
-=======
-        self.assertIsNone(component.send_message(['foo', 'bar']))
         component.stop()
->>>>>>> Replace while True with while not self._stopped to make thread stoppable
 
     def test_send_message_unicode(self):
         component = AsyncComponent(
-            input_stream=BlockingBytesIO(), output_stream=BlockingBytesIO()
+            input_stream=BlockingBytesIO(), output_stream=BytesIO()
         )
         component._reader.start()
         component._writer.start()
@@ -740,13 +719,13 @@ class AsyncComponentTests(unittest.TestCase):
             )
 
         # Check that we properly skip over invalid input
-        self.assertIsNone(component.send_message(['foo', 'bar']))
+        self.assertIsNone(component.send_message(["foo", "bar"]))
         component.stop()
 
     @patch.object(AsyncComponent, "send_message", autospec=True)
     def test_log(self, send_message_mock):
         component = AsyncComponent(
-            input_stream=BlockingBytesIO(), output_stream=BlockingBytesIO()
+            input_stream=BlockingBytesIO(), output_stream=BytesIO()
         )
         component._reader.start()
         component._writer.start()
@@ -760,26 +739,26 @@ class AsyncComponentTests(unittest.TestCase):
                 BlockingBytesIO()
             )
             component.log(msg, level=level)
-            send_message_mock.assert_called_with(component, {'command': 'log',
-                                                             'msg': msg,
-                                                             'level': storm_level})
+            send_message_mock.assert_called_with(
+                component, {"command": "log", "msg": msg, "level": storm_level}
+            )
         component.stop()
 
-    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
+    @patch.object(Component, "_exit", new=lambda self, code: sys.exit(code))
     def test_exit_on_exception_true(self):
         handshake_dict = {"conf": self.conf, "pidDir": ".", "context": self.context}
         inputs = ["{}\n".format(json.dumps(handshake_dict)), "end\n"]
         component = AsyncComponent(
             input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            output_stream=BytesIO(),
         )
         with self.assertRaises(SystemExit) as raises_fixture:
             component.run()
             assert raises_fixture.exception.value == 1
         component.stop()
 
-    @patch.object(AsyncComponent, '_run', autospec=True)
-    @patch.object(Component, '_exit', new=lambda self, code: sys.exit(code))
+    @patch.object(AsyncComponent, "_run", autospec=True)
+    @patch.object(Component, "_exit", new=lambda self, code: sys.exit(code))
     def test_exit_on_exception_false(self, _run_mock):
         # Make sure _run raises an exception
         def raiser(self):  # lambdas can't raise
@@ -791,7 +770,7 @@ class AsyncComponentTests(unittest.TestCase):
         inputs = ["{}\n".format(json.dumps(handshake_dict)), "end\n"]
         component = AsyncComponent(
             input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
-            output_stream=BlockingBytesIO(),
+            output_stream=BytesIO(),
         )
         component.exit_on_exception = False
         with self.assertRaises(SystemExit) as raises_fixture:

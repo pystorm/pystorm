@@ -544,4 +544,5 @@ class TicklessBatchingBolt(BatchingBolt):
         """
         super(TicklessBatchingBolt, self).stop()
         # Terminate the batcher thread if we've stopped
-        self._batcher.join()
+        if self._batcher.is_alive():
+            self._batcher.join()
