@@ -352,7 +352,7 @@ class Component(object):
 
         Only supported in Storm 0.9.3+.
 
-        .. note:
+        .. note::
             In order for this to work, the metric must be registered on the
             Storm side.  See example code
             `here <https://github.com/dashengju/storm/blob/573c42a64885dac9a6a0d4c69a754500b607a8f1/storm-core/src/jvm/backtype/storm/testing/PythonShellMetricsBolt.java#L22-L23>`__.
