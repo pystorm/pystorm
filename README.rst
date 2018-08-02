@@ -5,8 +5,7 @@ Apache Storm.  With pystorm you can create Storm bolts and spouts in
 Python without having to write a single line of Java.  It is meant to be used
 under-the-hood by Storm Python libraries that will provide the command-line
 tools for actually building/submitting the topologies (e.g.,
-`streamparse <https://github.com/Parsely/streamparse>`_ and
-`pyleus <https://github.com/Yelp/pyleus>`_).
+`streamparse <https://github.com/Parsely/streamparse>`_).
 
 Documentation
 -------------
