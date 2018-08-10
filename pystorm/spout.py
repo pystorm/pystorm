@@ -114,7 +114,7 @@ class Spout(Component):
         self.send_message({'command': 'sync'})
 
 
-class ReliableSpout(Component):
+class ReliableSpout(Spout):
     """Reliable spout that will automatically replay failed tuples.
 
     Failed tuples will be replayed up to ``max_fails`` times.
