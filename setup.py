@@ -34,7 +34,7 @@ def readme():
 install_requires = [
     'six>=1.5',
     'simplejson>=2.2.0',
-    'msgpack-python'
+    'msgpack'
 ]
 
 if sys.version_info.major < 3:
