@@ -1,4 +1,5 @@
-six>=1.5
+contextlib2; python_version < '3.2'
+msgpack
 setuptools
 simplejson>=2.2.0
-msgpack-python
+six>=1.5
