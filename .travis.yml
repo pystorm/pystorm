@@ -8,12 +8,24 @@ python:
   - "3.6"
   - "3.7-dev"
   - "pypy"
+env:
+  global:
+    - NO_MSGPACK=0
+
+matrix:
+  fast_finish: true
+  include:
+    - python: '3.6'
+      env: NO_MSGPACK=1
 
 install:
   - travis_retry pip install --upgrade pip setuptools
   - travis_retry pip install --upgrade --upgrade-strategy only-if-needed -r test-requirements.txt
   - travis_retry pip install --upgrade --upgrade-strategy only-if-needed -r requirements.txt
+  - echo NO_MSGPACK=${NO_MSGPACK}
   - echo TRAVIS_PYTHON_VERSION=${TRAVIS_PYTHON_VERSION}
+  - if [ ${NO_MSGPACK} == "1" ]; then travis_retry pip uninstall msgpack msgpack-python; fi
+  - if [ ${NO_MSGPACK} == "0" ]; then travis_retry pip install msgpack; fi
   - python setup.py --version
 
 # Run test
@@ -23,4 +35,4 @@ script:
 
 # Calculate coverage on success
 after_success:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then coveralls --config_file .coveragerc; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then coveralls --rcfile=.coveragerc; fi
