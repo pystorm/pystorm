@@ -1,5 +1,6 @@
 """ Pystorm-specific exceptions """
 
+
 class StormWentAwayError(Exception):
     """Raised when the connection between the component and Storm terminates.
     """

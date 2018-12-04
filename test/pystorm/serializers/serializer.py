@@ -19,7 +19,6 @@ class SerializerTestCase(object):
 
     @pytest.fixture(autouse=True)
     def instance_fixture(self):
-        self.instance = self.INSTANCE_CLS(BytesIO(),
-                                          BytesIO(),
-                                          reader_lock=RLock(),
-                                          writer_lock=RLock())
+        self.instance = self.INSTANCE_CLS(
+            BytesIO(), BytesIO(), reader_lock=RLock(), writer_lock=RLock()
+        )

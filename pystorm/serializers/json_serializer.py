@@ -16,10 +16,10 @@ log = logging.getLogger(__name__)
 
 
 class JSONSerializer(Serializer):
-
     def __init__(self, input_stream, output_stream, reader_lock, writer_lock):
-        super(JSONSerializer, self).__init__(input_stream, output_stream,
-                                             reader_lock, writer_lock)
+        super(JSONSerializer, self).__init__(
+            input_stream, output_stream, reader_lock, writer_lock
+        )
         self.input_stream = self._wrap_stream(input_stream)
         self.output_stream = self._wrap_stream(output_stream)
 
@@ -28,13 +28,13 @@ class JSONSerializer(Serializer):
         """Returns a TextIOWrapper around the given stream that handles UTF-8
         encoding/decoding.
         """
-        if hasattr(stream, 'buffer'):
-            return io.TextIOWrapper(stream.buffer, encoding='utf-8')
-        elif hasattr(stream, 'readable'):
-            return io.TextIOWrapper(stream, encoding='utf-8')
+        if hasattr(stream, "buffer"):
+            return io.TextIOWrapper(stream.buffer, encoding="utf-8")
+        elif hasattr(stream, "readable"):
+            return io.TextIOWrapper(stream, encoding="utf-8")
         # Python 2.x stdin and stdout are just files
         else:
-            return io.open(stream.fileno(), mode=stream.mode, encoding='utf-8')
+            return io.open(stream.fileno(), mode=stream.mode, encoding="utf-8")
 
     def read_message(self):
         """The Storm multilang protocol consists of JSON messages followed by
@@ -68,19 +68,21 @@ class JSONSerializer(Serializer):
             # should only have line == '' if we're at EOF
             with self._reader_lock:
                 line = self.input_stream.readline()
-            if line == 'end\n':
+            if line == "end\n":
                 break
-            elif line == '':
+            elif line == "":
                 raise StormWentAwayError()
-            elif line == '\n':
+            elif line == "\n":
                 num_blank_lines += 1
                 if num_blank_lines % 1000 == 0:
-                    log.warn("While trying to read a command or pending task "
-                             "ID, Storm has instead sent %s '\\n' messages.",
-                             num_blank_lines)
+                    log.warn(
+                        "While trying to read a command or pending task "
+                        "ID, Storm has instead sent %s '\\n' messages.",
+                        num_blank_lines,
+                    )
                 continue
 
-            msg = '{}{}\n'.format(msg, line[0:-1])
+            msg = "{}{}\n".format(msg, line[0:-1])
 
         try:
             return json.loads(msg)
@@ -92,6 +94,6 @@ class JSONSerializer(Serializer):
         """Serialize to JSON a message dictionary."""
         serialized = json.dumps(msg_dict, namedtuple_as_object=False)
         if PY2:
-            serialized = serialized.decode('utf-8')
-        serialized = '{}\nend\n'.format(serialized)
+            serialized = serialized.decode("utf-8")
+        serialized = "{}\nend\n".format(serialized)
         return serialized

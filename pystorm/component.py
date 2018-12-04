@@ -23,20 +23,24 @@ _STORM_LOG_DEBUG = 1
 _STORM_LOG_INFO = 2
 _STORM_LOG_WARN = 3
 _STORM_LOG_ERROR = 4
-_STORM_LOG_LEVELS = {'trace': _STORM_LOG_TRACE,
-                     'debug': _STORM_LOG_DEBUG,
-                     'info': _STORM_LOG_INFO,
-                     'warn': _STORM_LOG_WARN,
-                     'warning': _STORM_LOG_WARN,
-                     'error': _STORM_LOG_ERROR,
-                     'critical': _STORM_LOG_ERROR}
-_PYTHON_LOG_LEVELS = {'critical': logging.CRITICAL,
-                      'error': logging.ERROR,
-                      'warning': logging.WARNING,
-                      'warn': logging.WARNING,
-                      'info': logging.INFO,
-                      'debug': logging.DEBUG,
-                      'trace': logging.DEBUG}
+_STORM_LOG_LEVELS = {
+    "trace": _STORM_LOG_TRACE,
+    "debug": _STORM_LOG_DEBUG,
+    "info": _STORM_LOG_INFO,
+    "warn": _STORM_LOG_WARN,
+    "warning": _STORM_LOG_WARN,
+    "error": _STORM_LOG_ERROR,
+    "critical": _STORM_LOG_ERROR,
+}
+_PYTHON_LOG_LEVELS = {
+    "critical": logging.CRITICAL,
+    "error": logging.ERROR,
+    "warning": logging.WARNING,
+    "warn": logging.WARNING,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
+    "trace": logging.DEBUG,
+}
 _SERIALIZERS = {"json": JSONSerializer, "msgpack": MsgpackSerializer}
 
 
@@ -47,11 +51,14 @@ def remote_pdb_handler(signum, frame):
     """ Handler to drop us into a remote debugger upon receiving SIGUSR1 """
     try:
         from remote_pdb import RemotePdb
-        rdb = RemotePdb(host='127.0.0.1', port=0)
+
+        rdb = RemotePdb(host="127.0.0.1", port=0)
         rdb.set_trace(frame=frame)
     except ImportError:
-        log.warning('remote_pdb unavailable.  Please install remote_pdb to '
-                    'allow remote debugging.')
+        log.warning(
+            "remote_pdb unavailable.  Please install remote_pdb to "
+            "allow remote debugging."
+        )
     # Restore signal handler for later
     signal.signal(signum, remote_pdb_handler)
 
@@ -78,10 +85,10 @@ class StormHandler(logging.Handler):
         """
         try:
             msg = self.format(record)
-            level = _STORM_LOG_LEVELS.get(record.levelname.lower(),
-                                          _STORM_LOG_INFO)
-            self.serializer.send_message({'command': 'log', 'msg': str(msg),
-                                          'level': level})
+            level = _STORM_LOG_LEVELS.get(record.levelname.lower(), _STORM_LOG_INFO)
+            self.serializer.send_message(
+                {"command": "log", "msg": str(msg), "level": level}
+            )
         except Exception:
             self.handleError(record)
 
@@ -90,6 +97,7 @@ class LogStream(object):
     """Object that implements enough of the Python stream API to be used as
     sys.stdout. Messages are written to the Python logger.
     """
+
     def __init__(self, logger):
         self.logger = logger
 
@@ -113,7 +121,7 @@ class LogStream(object):
         pass
 
 
-Tuple = namedtuple('Tuple', 'id component stream task values')
+Tuple = namedtuple("Tuple", "id component stream task values")
 """Storm's primitive data type passed around via streams.
 
 :ivar id: the ID of the Tuple.
@@ -173,10 +181,16 @@ class Component(object):
                               ``StormWentAwayError`` is raised.  Defaults to
                               ``True``.
     """
+
     exit_on_exception = True
 
-    def __init__(self, input_stream=sys.stdin, output_stream=sys.stdout,
-                 rdb_signal='SIGUSR1', serializer="json"):
+    def __init__(
+        self,
+        input_stream=sys.stdin,
+        output_stream=sys.stdout,
+        rdb_signal="SIGUSR1",
+        serializer="json",
+    ):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
         self.topology_name = None
@@ -194,16 +208,14 @@ class Component(object):
         self._reader_lock = threading.RLock()
         self._writer_lock = threading.RLock()
         if serializer in _SERIALIZERS:
-            self.serializer = _SERIALIZERS[serializer](input_stream,
-                                                       output_stream,
-                                                       self._reader_lock,
-                                                       self._writer_lock)
+            self.serializer = _SERIALIZERS[serializer](
+                input_stream, output_stream, self._reader_lock, self._writer_lock
+            )
         else:
             raise ValueError("Unknown serializer: {0}", serializer)
 
         # Only default to SIGUSR1 on systems that have it
-        if isinstance(rdb_signal, string_types) and hasattr(signal,
-                                                            rdb_signal):
+        if isinstance(rdb_signal, string_types) and hasattr(signal, rdb_signal):
             rdb_signal = getattr(signal, rdb_signal)
 
         # Setup remote pdb handler if asked to
@@ -213,58 +225,64 @@ class Component(object):
     @staticmethod
     def is_heartbeat(tup):
         """ :returns: Whether or not the given Tuple is a heartbeat """
-        return tup.task == -1 and tup.stream == '__heartbeat'
+        return tup.task == -1 and tup.stream == "__heartbeat"
 
     def _setup_component(self, storm_conf, context):
         """Add helpful instance variables to component after initial handshake
         with Storm.  Also configure logging.
         """
-        self.topology_name = storm_conf.get('topology.name', '')
-        self.task_id = context.get('taskid', '')
-        self.component_name = context.get('componentid')
+        self.topology_name = storm_conf.get("topology.name", "")
+        self.task_id = context.get("taskid", "")
+        self.component_name = context.get("componentid")
         # If using Storm before 0.10.0 componentid is not available
         if self.component_name is None:
-            self.component_name = context.get('task->component', {})\
-                                         .get(str(self.task_id), '')
+            self.component_name = context.get("task->component", {}).get(
+                str(self.task_id), ""
+            )
         self.debug = storm_conf.get("topology.debug", False)
         self.storm_conf = storm_conf
         self.context = context
 
         # Set up logging
-        self.logger = logging.getLogger('.'.join((__name__,
-                                                  self.component_name)))
-        log_path = self.storm_conf.get('pystorm.log.path')
-        log_file_name = self.storm_conf.get('pystorm.log.file',
-                                            'pystorm_{topology_name}'
-                                            '_{component_name}'
-                                            '_{task_id}'
-                                            '_{pid}.log')
+        self.logger = logging.getLogger(".".join((__name__, self.component_name)))
+        log_path = self.storm_conf.get("pystorm.log.path")
+        log_file_name = self.storm_conf.get(
+            "pystorm.log.file",
+            "pystorm_{topology_name}" "_{component_name}" "_{task_id}" "_{pid}.log",
+        )
         root_log = logging.getLogger()
-        log_level = self.storm_conf.get('pystorm.log.level', 'info')
+        log_level = self.storm_conf.get("pystorm.log.level", "info")
         if log_path:
-            max_bytes = self.storm_conf.get('pystorm.log.max_bytes',
-                                            1000000)  # 1 MB
-            backup_count = self.storm_conf.get('pystorm.log.backup_count',
-                                               10)
-            log_file = join(log_path,
-                            (log_file_name
-                             .format(topology_name=self.topology_name,
-                                     component_name=self.component_name,
-                                     task_id=self.task_id,
-                                     pid=self.pid)))
-            handler = RotatingFileHandler(log_file, maxBytes=max_bytes,
-                                          backupCount=backup_count)
-            log_format = self.storm_conf.get('pystorm.log.format',
-                                             '%(asctime)s - %(name)s - '
-                                             '%(levelname)s - %(message)s')
+            max_bytes = self.storm_conf.get("pystorm.log.max_bytes", 1000000)  # 1 MB
+            backup_count = self.storm_conf.get("pystorm.log.backup_count", 10)
+            log_file = join(
+                log_path,
+                (
+                    log_file_name.format(
+                        topology_name=self.topology_name,
+                        component_name=self.component_name,
+                        task_id=self.task_id,
+                        pid=self.pid,
+                    )
+                ),
+            )
+            handler = RotatingFileHandler(
+                log_file, maxBytes=max_bytes, backupCount=backup_count
+            )
+            log_format = self.storm_conf.get(
+                "pystorm.log.format",
+                "%(asctime)s - %(name)s - " "%(levelname)s - %(message)s",
+            )
         else:
-            self.log('pystorm StormHandler logging enabled, so all messages at '
-                     'levels greater than "pystorm.log.level" ({}) will be sent'
-                     ' to Storm.'.format(log_level))
+            self.log(
+                "pystorm StormHandler logging enabled, so all messages at "
+                'levels greater than "pystorm.log.level" ({}) will be sent'
+                " to Storm.".format(log_level)
+            )
             handler = StormHandler(self.serializer)
-            log_format = self.storm_conf.get('pystorm.log.format',
-                                             '%(asctime)s - %(name)s - '
-                                             '%(message)s')
+            log_format = self.storm_conf.get(
+                "pystorm.log.format", "%(asctime)s - %(name)s - " "%(message)s"
+            )
         formatter = logging.Formatter(log_format)
         log_level = _PYTHON_LOG_LEVELS.get(log_level, logging.INFO)
         if self.debug:
@@ -275,11 +293,11 @@ class Component(object):
         handler.setFormatter(formatter)
         root_log.addHandler(handler)
         self.logger.setLevel(log_level)
-        logging.getLogger('pystorm').setLevel(log_level)
+        logging.getLogger("pystorm").setLevel(log_level)
         # Redirect stdout to ensure that print statements/functions
         # won't disrupt the multilang protocol
         if self.serializer.output_stream == sys.stdout:
-            sys.stdout = LogStream(logging.getLogger('pystorm.stdout'))
+            sys.stdout = LogStream(logging.getLogger("pystorm.stdout"))
 
     def read_message(self):
         """Read a message from Storm via serializer."""
@@ -308,11 +326,11 @@ class Component(object):
     def read_handshake(self):
         """Read and process an initial handshake message from Storm."""
         msg = self.read_message()
-        pid_dir, _conf, _context = msg['pidDir'], msg['conf'], msg['context']
+        pid_dir, _conf, _context = msg["pidDir"], msg["conf"], msg["context"]
 
         # Write a blank PID file out to the pidDir
-        open(join(pid_dir, str(self.pid)), 'w').close()
-        self.send_message({'pid': self.pid})
+        open(join(pid_dir, str(self.pid)), "w").close()
+        self.send_message({"pid": self.pid})
 
         return _conf, _context
 
@@ -320,8 +338,12 @@ class Component(object):
         """Send a message to Storm via stdout."""
         if not isinstance(message, dict):
             logger = self.logger if self.logger else log
-            logger.error("%s.%d attempted to send a non dict message to Storm: "
-                         "%r", self.component_name, self.pid, message)
+            logger.error(
+                "%s.%d attempted to send a non dict message to Storm: " "%r",
+                self.component_name,
+                self.pid,
+                message,
+            )
             return
         self.serializer.send_message(message)
 
@@ -332,15 +354,17 @@ class Component(object):
         :param tup: a :class:`Tuple` object.
         """
         if tup:
-            message = ('Python {exception_name} raised while processing Tuple '
-                       '{tup!r}\n{traceback}')
+            message = (
+                "Python {exception_name} raised while processing Tuple "
+                "{tup!r}\n{traceback}"
+            )
         else:
-            message = 'Python {exception_name} raised\n{traceback}'
-        message = message.format(exception_name=exception.__class__.__name__,
-                                 tup=tup,
-                                 traceback=format_exc())
-        self.send_message({'command': 'error', 'msg': str(message)})
-        self.send_message({'command': 'sync'})  # sync up right away
+            message = "Python {exception_name} raised\n{traceback}"
+        message = message.format(
+            exception_name=exception.__class__.__name__, tup=tup, traceback=format_exc()
+        )
+        self.send_message({"command": "error", "msg": str(message)})
+        self.send_message({"command": "sync"})  # sync up right away
 
     def report_metric(self, name, value):
         """Report a custom metric back to Storm.
@@ -355,7 +379,7 @@ class Component(object):
             Storm side.  See example code
             `here <https://github.com/dashengju/storm/blob/573c42a64885dac9a6a0d4c69a754500b607a8f1/storm-core/src/jvm/backtype/storm/testing/PythonShellMetricsBolt.java#L22-L23>`__.
         """
-        self.send_message({'command': 'metrics', 'name': name, 'params': value})
+        self.send_message({"command": "metrics", "name": name, "params": value})
 
     def log(self, message, level=None):
         """Log a message to Storm optionally providing a logging level.
@@ -377,11 +401,17 @@ class Component(object):
           the time to serialize your message and send it to Storm).
         """
         level = _STORM_LOG_LEVELS.get(level, _STORM_LOG_INFO)
-        self.send_message({'command': 'log', 'msg': str(message),
-                           'level': level})
+        self.send_message({"command": "log", "msg": str(message), "level": level})
 
-    def emit(self, tup, tup_id=None, stream=None, anchors=None,
-             direct_task=None, need_task_ids=False):
+    def emit(
+        self,
+        tup,
+        tup_id=None,
+        stream=None,
+        anchors=None,
+        direct_task=None,
+        need_task_ids=False,
+    ):
         """Emit a new Tuple to a stream.
 
         :param tup: the Tuple payload to send to Storm, should contain only
@@ -411,26 +441,28 @@ class Component(object):
                   ``[direct_task]``.
         """
         if not isinstance(tup, (list, tuple)):
-            raise TypeError('All Tuples must be either lists or tuples, '
-                            'received {!r} instead.'.format(type(tup)))
+            raise TypeError(
+                "All Tuples must be either lists or tuples, "
+                "received {!r} instead.".format(type(tup))
+            )
 
-        msg = {'command': 'emit', 'tuple': tup}
+        msg = {"command": "emit", "tuple": tup}
         downstream_task_ids = None
 
         if anchors is not None:
-            msg['anchors'] = anchors
+            msg["anchors"] = anchors
         if tup_id is not None:
-            msg['id'] = tup_id
+            msg["id"] = tup_id
         if stream is not None:
-            msg['stream'] = stream
+            msg["stream"] = stream
         if direct_task is not None:
-            msg['task'] = direct_task
+            msg["task"] = direct_task
             if need_task_ids:
                 downstream_task_ids = [direct_task]
 
         if not need_task_ids:
             # only need to send on False, Storm's default is True
-            msg['need_task_ids'] = need_task_ids
+            msg["need_task_ids"] = need_task_ids
 
         if need_task_ids and direct_task is None:
             # Use both locks so we ensure send_message and read_task_ids are for
@@ -487,7 +519,7 @@ class Component(object):
             try:
                 self._run()
             except StormWentAwayError:
-                log.info('Exiting because parent Storm process went away.')
+                log.info("Exiting because parent Storm process went away.")
                 self._exit(2)
             except Exception as e:
                 log_msg = "Exception in {}.run()".format(self.__class__.__name__)
@@ -497,12 +529,14 @@ class Component(object):
                     self._handle_run_exception(e)
                 except StormWentAwayError:
                     log.error(log_msg, exc_info=exc_info)
-                    log.info('Exiting because parent Storm process went away.')
+                    log.info("Exiting because parent Storm process went away.")
                     self._exit(2)
                 except:
                     log.error(log_msg, exc_info=exc_info)
-                    log.error('While trying to handle previous exception...',
-                              exc_info=sys.exc_info())
+                    log.error(
+                        "While trying to handle previous exception...",
+                        exc_info=sys.exc_info(),
+                    )
 
                 if self.exit_on_exception:
                     self._exit(1)

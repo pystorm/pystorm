@@ -8,10 +8,13 @@ import warnings
 
 try:
     import msgpack
+
     HAVE_MSGPACK = True
 except:
-    warnings.warn('Cannot import msgpack. It is necessary for using MsgpackSerializer',
-                  category=ImportWarning)
+    warnings.warn(
+        "Cannot import msgpack. It is necessary for using MsgpackSerializer",
+        category=ImportWarning,
+    )
     HAVE_MSGPACK = False
 
 from ..exceptions import StormWentAwayError
@@ -19,20 +22,21 @@ from .serializer import Serializer
 
 
 if HAVE_MSGPACK:
+
     class MsgpackSerializer(Serializer):
 
         CHUNK_SIZE = 1024 ** 2
 
         def __init__(self, input_stream, output_stream, reader_lock, writer_lock):
-            super(MsgpackSerializer, self).__init__(input_stream,
-                                                    self._raw_stream(output_stream),
-                                                    reader_lock, writer_lock)
+            super(MsgpackSerializer, self).__init__(
+                input_stream, self._raw_stream(output_stream), reader_lock, writer_lock
+            )
             self._messages = self._messages_generator()
 
         @staticmethod
         def _raw_stream(stream):
             """Returns the raw buffer used by stream, so we can write bytes."""
-            if hasattr(stream, 'buffer'):
+            if hasattr(stream, "buffer"):
                 return stream.buffer
             else:
                 return stream
@@ -73,5 +77,7 @@ if HAVE_MSGPACK:
             """
             # TODO: Determine if we need use_bin_type here
             return msgpack.packb(msg_dict)
+
+
 else:
     MsgpackSerializer = Serializer

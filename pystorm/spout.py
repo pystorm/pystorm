@@ -47,8 +47,9 @@ class Spout(Component):
         """
         raise NotImplementedError()
 
-    def emit(self, tup, tup_id=None, stream=None, direct_task=None,
-             need_task_ids=False):
+    def emit(
+        self, tup, tup_id=None, stream=None, direct_task=None, need_task_ids=False
+    ):
         """Emit a spout Tuple message.
 
         :param tup: the Tuple to send to Storm, should contain only
@@ -72,9 +73,13 @@ class Spout(Component):
                   that when specifying direct_task, this will be equal to
                   ``[direct_task]``.
         """
-        return super(Spout, self).emit(tup, tup_id=tup_id, stream=stream,
-                                       direct_task=direct_task,
-                                       need_task_ids=need_task_ids)
+        return super(Spout, self).emit(
+            tup,
+            tup_id=tup_id,
+            stream=stream,
+            direct_task=direct_task,
+            need_task_ids=need_task_ids,
+        )
 
     def activate(self):
         """Called when the Spout has been activated after being deactivated.
@@ -83,7 +88,6 @@ class Spout(Component):
             This requires at least Storm 1.1.0.
         """
         pass
-
 
     def deactivate(self):
         """Called when the Spout has been deactivated.
@@ -99,19 +103,19 @@ class Spout(Component):
         Separated out so it can be properly unit tested.
         """
         cmd = self.read_command()
-        if cmd['command'] == 'next':
+        if cmd["command"] == "next":
             self.next_tuple()
-        elif cmd['command'] == 'ack':
-            self.ack(cmd['id'])
-        elif cmd['command'] == 'fail':
-            self.fail(cmd['id'])
-        elif cmd['command'] == 'activate':
+        elif cmd["command"] == "ack":
+            self.ack(cmd["id"])
+        elif cmd["command"] == "fail":
+            self.fail(cmd["id"])
+        elif cmd["command"] == "activate":
             self.activate()
-        elif cmd['command'] == 'deactivate':
+        elif cmd["command"] == "deactivate":
             self.deactivate()
         else:
-            self.logger.error('Received invalid command from Storm: %r', cmd)
-        self.send_message({'command': 'sync'})
+            self.logger.error("Received invalid command from Storm: %r", cmd)
+        self.send_message({"command": "sync"})
 
 
 class ReliableSpout(Spout):
@@ -122,6 +126,7 @@ class ReliableSpout(Spout):
     For more information on spouts, consult Storm's
     `Concepts documentation <http://storm.apache.org/documentation/Concepts.html>`_.
     """
+
     max_fails = 3
 
     def __init__(self, *args, **kwargs):
@@ -140,7 +145,7 @@ class ReliableSpout(Spout):
         try:
             del self.unacked_tuples[tup_id]
         except KeyError:
-            self.logger.error('Received ack for unknown tuple ID: %r', tup_id)
+            self.logger.error("Received ack for unknown tuple ID: %r", tup_id)
 
     def fail(self, tup_id):
         """Called when a Tuple fails in the topology
@@ -154,21 +159,30 @@ class ReliableSpout(Spout):
         """
         saved_args = self.unacked_tuples.get(tup_id)
         if saved_args is None:
-            self.logger.error('Received fail for unknown tuple ID: %r', tup_id)
+            self.logger.error("Received fail for unknown tuple ID: %r", tup_id)
             return
         tup, stream, direct_task, need_task_ids = saved_args
         if self.failed_tuples[tup_id] < self.max_fails:
-            self.emit(tup, tup_id=tup_id, stream=stream,
-                      direct_task=direct_task, need_task_ids=need_task_ids)
+            self.emit(
+                tup,
+                tup_id=tup_id,
+                stream=stream,
+                direct_task=direct_task,
+                need_task_ids=need_task_ids,
+            )
             self.failed_tuples[tup_id] += 1
         else:
             # Just pretend we got an ack when we exceed retry limit
-            self.logger.info('Acking tuple ID %r after it exceeded retry limit '
-                             '(%r)', tup_id, self.max_fails)
+            self.logger.info(
+                "Acking tuple ID %r after it exceeded retry limit " "(%r)",
+                tup_id,
+                self.max_fails,
+            )
             self.ack(tup_id)
 
-    def emit(self, tup, tup_id=None, stream=None, direct_task=None,
-             need_task_ids=False):
+    def emit(
+        self, tup, tup_id=None, stream=None, direct_task=None, need_task_ids=False
+    ):
         """Emit a spout Tuple & add metadata about it to `unacked_tuples`.
 
         In order for this to work, `tup_id` is a required parameter.
@@ -176,11 +190,17 @@ class ReliableSpout(Spout):
         See :meth:`Bolt.emit`.
         """
         if tup_id is None:
-            raise ValueError('You must provide a tuple ID when emitting with a '
-                             'ReliableSpout in order for the tuple to be '
-                             'tracked.')
+            raise ValueError(
+                "You must provide a tuple ID when emitting with a "
+                "ReliableSpout in order for the tuple to be "
+                "tracked."
+            )
         args = (tup, stream, direct_task, need_task_ids)
         self.unacked_tuples[tup_id] = args
-        return super(ReliableSpout, self).emit(tup, tup_id=tup_id, stream=stream,
-                                               direct_task=direct_task,
-                                               need_task_ids=need_task_ids)
+        return super(ReliableSpout, self).emit(
+            tup,
+            tup_id=tup_id,
+            stream=stream,
+            direct_task=direct_task,
+            need_task_ids=need_task_ids,
+        )

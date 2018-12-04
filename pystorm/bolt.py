@@ -17,7 +17,7 @@ from .component import Component, Tuple
 
 # Convert names to valid Python identifiers by replacing non-word characters
 # whitespace and leading digits with underscores.
-_IDENTIFIER_RE = re.compile(r'\W|^(?=\d)')
+_IDENTIFIER_RE = re.compile(r"\W|^(?=\d)")
 
 
 log = logging.getLogger(__name__)
@@ -72,29 +72,35 @@ class Bolt(Component):
         # See Component._setup_component for docs
         super(Bolt, self)._setup_component(storm_conf, context)
         # source->stream->fields requires Storm 0.10.0 or later
-        source_stream_fields = context.get('source->stream->fields', {})
+        source_stream_fields = context.get("source->stream->fields", {})
         for source, stream_fields in iteritems(source_stream_fields):
             for stream, fields in iteritems(stream_fields):
-                type_name = (_IDENTIFIER_RE.sub('_', source.title()) +
-                             _IDENTIFIER_RE.sub('_', stream.title()) +
-                             'Tuple')
-                self._source_tuple_types[source][stream] = namedtuple(type_name,
-                                                                      fields)
+                type_name = (
+                    _IDENTIFIER_RE.sub("_", source.title())
+                    + _IDENTIFIER_RE.sub("_", stream.title())
+                    + "Tuple"
+                )
+                self._source_tuple_types[source][stream] = namedtuple(type_name, fields)
 
     @staticmethod
     def is_tick(tup):
         """ :returns: Whether or not the given Tuple is a tick Tuple """
-        return tup.component == '__system' and tup.stream == '__tick'
+        return tup.component == "__system" and tup.stream == "__tick"
 
     def read_tuple(self):
         """Read a tuple from the pipe to Storm."""
         cmd = self.read_command()
-        source = cmd['comp']
-        stream = cmd['stream']
-        values = cmd['tuple']
+        source = cmd["comp"]
+        stream = cmd["stream"]
+        values = cmd["tuple"]
         val_type = self._source_tuple_types[source].get(stream)
-        return Tuple(cmd['id'], source, stream, cmd['task'],
-                     tuple(values) if val_type is None else val_type(*values))
+        return Tuple(
+            cmd["id"],
+            source,
+            stream,
+            cmd["task"],
+            tuple(values) if val_type is None else val_type(*values),
+        )
 
     def process(self, tup):
         """Process a single Tuple :class:`pystorm.component.Tuple` of
@@ -127,8 +133,9 @@ class Bolt(Component):
         """
         pass
 
-    def emit(self, tup, stream=None, anchors=None, direct_task=None,
-             need_task_ids=False):
+    def emit(
+        self, tup, stream=None, anchors=None, direct_task=None, need_task_ids=False
+    ):
         """Emit a new Tuple to a stream.
 
         :param tup: the Tuple payload to send to Storm, should contain only
@@ -158,9 +165,13 @@ class Bolt(Component):
             anchors = self._current_tups if self.auto_anchor else []
         anchors = [a.id if isinstance(a, Tuple) else a for a in anchors]
 
-        return super(Bolt, self).emit(tup, stream=stream, anchors=anchors,
-                                      direct_task=direct_task,
-                                      need_task_ids=need_task_ids)
+        return super(Bolt, self).emit(
+            tup,
+            stream=stream,
+            anchors=anchors,
+            direct_task=direct_task,
+            need_task_ids=need_task_ids,
+        )
 
     def ack(self, tup):
         """Indicate that processing of a Tuple has succeeded.
@@ -169,7 +180,7 @@ class Bolt(Component):
         :type tup: :class:`str` or :class:`pystorm.component.Tuple`
         """
         tup_id = tup.id if isinstance(tup, Tuple) else tup
-        self.send_message({'command': 'ack', 'id': tup_id})
+        self.send_message({"command": "ack", "id": tup_id})
 
     def fail(self, tup):
         """Indicate that processing of a Tuple has failed.
@@ -178,7 +189,7 @@ class Bolt(Component):
         :type tup: :class:`str` or :class:`pystorm.component.Tuple`
         """
         tup_id = tup.id if isinstance(tup, Tuple) else tup
-        self.send_message({'command': 'fail', 'id': tup_id})
+        self.send_message({"command": "fail", "id": tup_id})
 
     def _run(self):
         """The inside of ``run``'s infinite loop.
@@ -188,15 +199,15 @@ class Bolt(Component):
         tup = self.read_tuple()
         self._current_tups = [tup]
         if self.is_heartbeat(tup):
-            self.send_message({'command': 'sync'})
+            self.send_message({"command": "sync"})
         elif self.is_tick(tup):
             self.process_tick(tup)
             if self.auto_ack:
-                 self.ack(tup)
+                self.ack(tup)
         else:
             self.process(tup)
             if self.auto_ack:
-                 self.ack(tup)
+                self.ack(tup)
         # Reset _current_tups so that we don't accidentally fail the wrong
         # Tuples if a successive call to read_tuple fails.
         # This is not done in `finally` clause because we want the current
@@ -309,7 +320,7 @@ class BatchingBolt(Bolt):
 
         :returns: ``None``.
         """
-        kwargs['need_task_ids'] = False
+        kwargs["need_task_ids"] = False
         return super(BatchingBolt, self).emit(tup, **kwargs)
 
     def process_tick(self, tick_tup):
@@ -368,7 +379,7 @@ class BatchingBolt(Bolt):
         self._current_tups = [self.read_tuple()]
         tup = self._current_tups[0]
         if self.is_heartbeat(tup):
-            self.send_message({'command': 'sync'})
+            self.send_message({"command": "sync"})
         elif self.is_tick(tup):
             self.process_tick(tup)
         else:
@@ -471,10 +482,10 @@ class TicklessBatchingBolt(BatchingBolt):
         signal.signal(signal.SIGUSR1, self._handle_worker_exception)
 
         iname = self.__class__.__name__
-        threading.current_thread().name = '{}:main-thread'.format(iname)
+        threading.current_thread().name = "{}:main-thread".format(iname)
         self._batch_lock = threading.RLock()
         self._batcher = threading.Thread(target=self._batch_entry)
-        self._batcher.name = '{}:_batcher-thread'.format(iname)
+        self._batcher.name = "{}:_batcher-thread".format(iname)
         self._batcher.daemon = True
         self._batcher.start()
 
@@ -525,7 +536,7 @@ class TicklessBatchingBolt(BatchingBolt):
         with self._batch_lock:
             self._current_tups = [tup]
             if self.is_heartbeat(tup):
-                self.send_message({'command': 'sync'})
+                self.send_message({"command": "sync"})
             elif self.is_tick(tup):
                 self.process_tick(tup)
             else:

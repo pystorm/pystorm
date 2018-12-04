@@ -13,7 +13,6 @@ log = logging.getLogger(__name__)
 
 
 class Serializer(object):
-
     def __init__(self, input_stream, output_stream, reader_lock, writer_lock):
         self._reader_lock = reader_lock
         self._writer_lock = writer_lock
@@ -35,7 +34,7 @@ class Serializer(object):
             except IOError:
                 raise StormWentAwayError()
             except:
-                log.exception('Failed to send message: %r', msg_dict)
+                log.exception("Failed to send message: %r", msg_dict)
 
     def serialize_dict(self, msg_dict):
         """Convert a message dictionary to bytes.  Used by send_message"""

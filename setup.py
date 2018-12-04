@@ -21,55 +21,51 @@ from setuptools import setup, find_packages
 
 # Get version without importing, which avoids dependency issues
 def get_version():
-    with open('pystorm/version.py') as version_file:
-        return re.search(r"""__version__\s+=\s+(['"])(?P<version>.+?)\1""",
-                         version_file.read()).group('version')
+    with open("pystorm/version.py") as version_file:
+        return re.search(
+            r"""__version__\s+=\s+(['"])(?P<version>.+?)\1""", version_file.read()
+        ).group("version")
+
 
 def readme():
-    ''' Returns README.rst contents as str '''
-    with open('README.rst') as f:
+    """ Returns README.rst contents as str """
+    with open("README.rst") as f:
         return f.read()
 
 
-install_requires = [
-    'six>=1.5',
-    'simplejson>=2.2.0',
-]
+install_requires = ["six>=1.5", "simplejson>=2.2.0"]
 
 if sys.version_info.major < 3:
-    install_requires.append('contextlib2')
+    install_requires.append("contextlib2")
 
-lint_requires = [
-    'pep8',
-    'pyflakes'
-]
+lint_requires = ["pep8", "pyflakes"]
 
-tests_require = ['pytest', 'pytest-timeout']
+tests_require = ["pytest", "pytest-timeout"]
 
 if sys.version_info.major < 3:
-    tests_require.append('mock')
+    tests_require.append("mock")
 
 dependency_links = []
 setup_requires = []
 
 setup(
-    name='pystorm',
+    name="pystorm",
     version=get_version(),
-    author='Parsely, Inc.',
-    author_email='hello@parsely.com',
-    url='https://github.com/pystorm/pystorm',
-    description=('Battle-tested Apache Storm Multi-Lang implementation for Python.'),
+    author="Parsely, Inc.",
+    author_email="hello@parsely.com",
+    url="https://github.com/pystorm/pystorm",
+    description=("Battle-tested Apache Storm Multi-Lang implementation for Python."),
     long_description=readme(),
-    license='Apache License 2.0',
+    license="Apache License 2.0",
     packages=find_packages(),
     install_requires=install_requires,
     tests_require=tests_require,
     setup_requires=setup_requires,
     extras_require={
-        'test': tests_require,
-        'all': install_requires + tests_require,
-        'docs': ['sphinx'] + tests_require,
-        'lint': lint_requires
+        "test": tests_require,
+        "all": install_requires + tests_require,
+        "docs": ["sphinx"] + tests_require,
+        "lint": lint_requires,
     },
     dependency_links=dependency_links,
     zip_safe=False,
