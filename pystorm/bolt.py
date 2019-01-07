@@ -12,7 +12,7 @@ from collections import defaultdict, namedtuple
 
 from six import iteritems, itervalues, reraise
 
-from .component import Component, Tuple
+from .component import AsyncComponent, Component, Tuple
 
 
 # Convert names to valid Python identifiers by replacing non-word characters
@@ -224,6 +224,15 @@ class Bolt(Component):
             self.raise_exception(exc, tup)
             if self.auto_fail:
                 self.fail(tup)
+
+
+class AsyncBolt(AsyncComponent, Bolt):
+    """A Bolt that uses separate threads for input, output, and processing.
+
+    This can improve performance in certain situations.
+    """
+
+    pass
 
 
 class BatchingBolt(Bolt):
@@ -479,14 +488,8 @@ class TicklessBatchingBolt(BatchingBolt):
     def __init__(self, *args, **kwargs):
         super(TicklessBatchingBolt, self).__init__(*args, **kwargs)
         self.exc_info = None
-        signal.signal(signal.SIGUSR1, self._handle_worker_exception)
-
-        iname = self.__class__.__name__
-        threading.current_thread().name = "{}:main-thread".format(iname)
         self._batch_lock = threading.RLock()
-        self._batcher = threading.Thread(target=self._batch_entry)
-        self._batcher.name = "{}:_batcher-thread".format(iname)
-        self._batcher.daemon = True
+        self._batcher = self._create_worker_thread(self._batch_entry)
         self._batcher.start()
 
     def process_tick(self, tick_tup):
@@ -504,21 +507,8 @@ class TicklessBatchingBolt(BatchingBolt):
 
     def _batch_entry(self):
         """Entry point for the batcher thread."""
-        try:
-            while True:
-                self._batch_entry_run()
-        except:
-            self.exc_info = sys.exc_info()
-            os.kill(self.pid, signal.SIGUSR1)  # interrupt stdin waiting
-
-    def _handle_worker_exception(self, signum, frame):
-        """Handle an exception raised in the worker thread.
-
-        Exceptions in the _batcher thread will send a SIGUSR1 to the main
-        thread which we catch here, and then raise in the main thread.
-        """
-        with self._batch_lock:
-            reraise(*self.exc_info)
+        while not self._stopped:
+            self._batch_entry_run()
 
     def _run(self):
         """The inside of ``run``'s infinite loop.
@@ -544,3 +534,15 @@ class TicklessBatchingBolt(BatchingBolt):
             # reset so that we don't accidentally fail the wrong Tuples
             # if a successive call to read_tuple fails
             self._current_tups = []
+
+    def stop(self):
+        """Stop pystorm threads that may be running for this bolt.
+
+        .. note::
+            This will not stop any custom threads you have added. Just the ones
+            pystorm created.
+        """
+        super(TicklessBatchingBolt, self).stop()
+        # Terminate the batcher thread if we've stopped
+        if self._batcher.is_alive():
+            self._batcher.join()

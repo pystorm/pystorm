@@ -1,21 +1,32 @@
 """Base primititve classes for working with Storm."""
 from __future__ import absolute_import, print_function, unicode_literals
 
+# Monkey patch everything for gevent if provided
+try:
+    from gevent import monkey
+
+    monkey.patch_all(sys=True)
+except (AttributeError, ImportError):
+    pass
+
 import logging
 import os
 import signal
 import sys
 import threading
+import time
 from collections import deque, namedtuple
 from logging.handlers import RotatingFileHandler
 from os.path import join
 from traceback import format_exc
 
-from six import string_types
+from six import reraise, string_types
+from six.moves.queue import Queue
 
 from .exceptions import StormWentAwayError
 from .serializers.msgpack_serializer import MsgpackSerializer
 from .serializers.json_serializer import JSONSerializer
+
 
 # Support for Storm Log levels as per STORM-414
 _STORM_LOG_TRACE = 0
@@ -180,6 +191,11 @@ class Component(object):
                               should exit when an exception other than
                               ``StormWentAwayError`` is raised.  Defaults to
                               ``True``.
+    :ivar rdb_signal: Signal to use to trigger remote_pdb handler for debugging
+                      running components.  Defaults to ``SIGUSR1``.
+    :ivar exception_signal: Signal to use to propagate thread exceptions up to
+                            main thread for processing.  Defaults to
+                            ``SIGUSR2``.
     """
 
     exit_on_exception = True
@@ -190,6 +206,7 @@ class Component(object):
         output_stream=sys.stdout,
         rdb_signal="SIGUSR1",
         serializer="json",
+        exception_signal="SIGUSR2",
     ):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
@@ -207,6 +224,7 @@ class Component(object):
         self._pending_task_ids = deque()
         self._reader_lock = threading.RLock()
         self._writer_lock = threading.RLock()
+        self._stopped = False
         if serializer in _SERIALIZERS:
             self.serializer = _SERIALIZERS[serializer](
                 input_stream, output_stream, self._reader_lock, self._writer_lock
@@ -218,9 +236,28 @@ class Component(object):
         if isinstance(rdb_signal, string_types) and hasattr(signal, rdb_signal):
             rdb_signal = getattr(signal, rdb_signal)
 
+        # Only default to SIGUSR2 on systems that have it
+        if isinstance(exception_signal, string_types) and hasattr(
+            signal, exception_signal
+        ):
+            exception_signal = getattr(signal, exception_signal)
+
         # Setup remote pdb handler if asked to
-        if rdb_signal is not None:
-            signal.signal(rdb_signal, remote_pdb_handler)
+        self.rdb_signal = rdb_signal
+        if self.rdb_signal is not None:
+            signal.signal(self.rdb_signal, remote_pdb_handler)
+
+        # Just in case we have worker threads
+        self.exception_signal = exception_signal
+        if self.exception_signal is not None:
+            signal.signal(self.exception_signal, self._handle_worker_exception)
+        else:
+            self.logger.warning(
+                "Leaving exception_signal unset will make your "
+                "component hang if it hits a worker exception."
+            )
+        iname = self.__class__.__name__
+        threading.current_thread().name = "{}:main-thread".format(iname)
 
     @staticmethod
     def is_heartbeat(tup):
@@ -325,7 +362,7 @@ class Component(object):
 
     def read_handshake(self):
         """Read and process an initial handshake message from Storm."""
-        msg = self.read_message()
+        msg = self.read_command()
         pid_dir, _conf, _context = msg["pidDir"], msg["conf"], msg["context"]
 
         # Write a blank PID file out to the pidDir
@@ -501,21 +538,13 @@ class Component(object):
         """
         pass
 
-    def run(self):
+    def _run_loop(self):
         """Main run loop for all components.
 
-        Performs initial handshake with Storm and reads Tuples handing them off
-        to subclasses.  Any exceptions are caught and logged back to Storm
-        prior to the Python process exiting.
-
-        .. warning::
-
-            Subclasses should **not** override this method.
+        Separated out so that we can run this from a thread other than main if
+        we wanted to.
         """
-        storm_conf, context = self.read_handshake()
-        self._setup_component(storm_conf, context)
-        self.initialize(storm_conf, context)
-        while True:
+        while not self._stopped:
             try:
                 self._run()
             except StormWentAwayError:
@@ -541,11 +570,28 @@ class Component(object):
                 if self.exit_on_exception:
                     self._exit(1)
 
+    def run(self):
+        """Initialize component and then start main run loop for this Component.
+
+        Performs initial handshake with Storm and reads Tuples handing them off
+        to subclasses.  Any exceptions are caught and logged back to Storm
+        prior to the Python process exiting.
+
+        .. warning::
+
+            Subclasses should **not** override this method.
+        """
+        storm_conf, context = self.read_handshake()
+        self._setup_component(storm_conf, context)
+        self.initialize(storm_conf, context)
+        self._run_loop()
+
     def _exit(self, status_code):
         """Properly kill Python process including zombie threads."""
         # If there are active threads still running infinite loops, sys.exit
         # won't kill them but os._exit will. os._exit skips calling cleanup
         # handlers, flushing stdio buffers, etc.
+        self.stop()
         exit_func = os._exit if threading.active_count() > 1 else sys.exit
         exit_func(status_code)
 
@@ -558,3 +604,126 @@ class Component(object):
         Called right before program exits.
         """
         self.raise_exception(exc)
+
+    def _create_worker_thread(self, entry_point):
+        """Create a daemon worker thread that will run a function.
+
+        This is a separate function so that all worker threads will raise
+        ``self.exception_signal`` when something goes wrong so that exceptions
+        will be handled by ``Component._handle_worker_exception``.
+        """
+
+        def _thread_wrapper():
+            try:
+                while not self._stopped:
+                    entry_point()
+            except:
+                self.exc_info = sys.exc_info()
+                os.kill(self.pid, self.exception_signal)  # interrupt stdin waiting
+
+        iname = self.__class__.__name__
+        thread = threading.Thread(target=_thread_wrapper)
+        thread.name = "{}:{}-thread".format(iname, entry_point.__name__)
+        thread.daemon = True
+        return thread
+
+    def _handle_worker_exception(self, signum, frame):
+        """Handle an exception raised in the worker thread.
+
+        Exceptions in the _batcher thread will send a SIGUSR2 to the main
+        thread which we catch here, and then raise in the main thread.
+        """
+        reraise(*self.exc_info)
+
+    def stop(self):
+        """Stop pystorm threads that may be running for this component
+
+        .. note::
+            This will not stop any custom threads you have added. Just the ones
+            pystorm created.
+        """
+        self._stopped = True
+
+
+class AsyncComponent(Component):
+    """A Component that uses separate threads for input, output, and processing.
+
+    This can improve performance in certain situations.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(AsyncComponent, self).__init__(*args, **kwargs)
+        # Use a Queue instead of a dequeue to store commands and task IDs
+        self._pending_commands = Queue(maxsize=1000)
+        self._pending_task_ids = Queue(maxsize=1000)
+        self._stdout_queue = Queue(maxsize=100)
+        self.exc_info = None
+        self._reader = self._create_worker_thread(self._reader)
+        self._writer = self._create_worker_thread(self._writer)
+        self._processor = self._create_worker_thread(self._run_loop)
+        self._stopped = False
+
+    def send_message(self, message):
+        """Queue up message to send to on stdout"""
+        self._stdout_queue.put(message)
+
+    def read_task_ids(self):
+        """Pull task IDs from queue"""
+        return self._pending_task_ids.get()
+
+    def read_command(self):
+        """Pull commands and tuples from queue"""
+        return self._pending_commands.get()
+
+    def _reader(self):
+        """Reader thread. Handles reading messages from stdin."""
+        while not self._stopped:
+            msg = self.read_message()
+            if isinstance(msg, list):
+                self._pending_task_ids.put(msg)
+            else:
+                self._pending_commands.put(msg)
+
+    def _writer(self):
+        """Writer thread. Handles writing messages to stdout."""
+        super_self = super(AsyncComponent, self)
+        while not self._stopped:
+            msg = self._stdout_queue.get()
+            super_self.send_message(msg)
+
+    def run(self):
+        """Main run loop for AsyncComponents.
+
+        Performs initial handshake with Storm and reads tuples handing them off
+        to subclasses.  Any exceptions are caught and logged back to Storm
+        prior to the Python process exiting.
+
+        We override run here (which we always advise against) because we want
+        _run to be called repeatedly in a thread/greenlet instead of in the main
+        thread.
+        """
+        self._reader.start()
+        self._writer.start()
+
+        storm_conf, context = self.read_handshake()
+        self._setup_component(storm_conf, context)
+        self.initialize(storm_conf, context)
+
+        self._processor.start()
+
+        # Wait forever, since exceptions will be raised via SIGUSR2
+        while not self._stopped:
+            time.sleep(0.1)
+
+    def stop(self):
+        """Stop pystorm threads that may be running for this component
+
+        .. note::
+            This will not stop any custom threads you have added. Just the ones
+            pystorm created.
+        """
+        super(AsyncComponent, self).stop()
+        # Join to stop threads when we're not running anymore
+        for thread in (self._reader, self._writer, self._processor):
+            if thread.is_alive():
+                thread.join()

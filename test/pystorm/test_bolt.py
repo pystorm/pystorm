@@ -18,9 +18,9 @@ except ImportError:
     import mock
     from mock import patch
 
-from pystorm import BatchingBolt, Bolt, Tuple
-from pystorm.exceptions import StormWentAwayError
+from pystorm import AsyncBolt, BatchingBolt, Bolt, Tuple
 
+from .test_component import BlockingBytesIO
 
 log = logging.getLogger(__name__)
 
@@ -583,6 +583,353 @@ class BatchingBoltTests(unittest.TestCase):
         )
         self.bolt._run()
         process_tick_mock.assert_called_with(self.bolt, read_tuple_mock.return_value)
+
+
+class AsyncBoltTests(unittest.TestCase):
+    def setUp(self):
+        self.conf = {
+            "topology.message.timeout.secs": 3,
+            "topology.tick.tuple.freq.secs": 1,
+            "topology.debug": True,
+            "topology.name": "foo",
+        }
+        self.context = {
+            "task->component": {
+                "1": "example-spout",
+                "2": "__acker",
+                "3": "example-bolt1",
+                "4": "example-bolt2",
+            },
+            "taskid": 3,
+            # Everything below this line is only available in Storm 0.11.0+
+            "componentid": "example-bolt1",
+            "stream->target->grouping": {
+                "default": {"example-bolt2": {"type": "SHUFFLE"}}
+            },
+            "streams": ["default"],
+            "stream->outputfields": {"default": ["word"]},
+            "source->stream->grouping": {
+                "example-spout": {"default": {"type": "FIELDS", "fields": ["word"]}}
+            },
+            "source->stream->fields": {
+                "example-spout": {"default": ["sentence", "word", "number"]}
+            },
+        }
+        self.tup_dict = {
+            "id": 14,
+            "comp": "some_spout",
+            "stream": "default",
+            "task": "some_bolt",
+            "tuple": [1, 2, 3],
+        }
+        tup_json = "{}\nend\n".format(json.dumps(self.tup_dict)).encode("utf-8")
+        self.tup = Tuple(
+            self.tup_dict["id"],
+            self.tup_dict["comp"],
+            self.tup_dict["stream"],
+            self.tup_dict["task"],
+            tuple(self.tup_dict["tuple"]),
+        )
+        self.bolt = AsyncBolt(
+            input_stream=BlockingBytesIO(tup_json), output_stream=BytesIO()
+        )
+        self.bolt.initialize(self.conf, self.context)
+
+    def tearDown(self):
+        self.bolt.stop()
+
+    def test_setup_component(self):
+        conf = self.conf
+        self.bolt._setup_component(conf, self.context)
+        self.assertEqual(
+            self.bolt._source_tuple_types["example-spout"]["default"].__name__,
+            "Example_SpoutDefaultTuple",
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_emit_basic(self, send_message_mock):
+        # A basic emit
+        self.bolt.emit([1, 2, 3], need_task_ids=False)
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "anchors": [],
+                "tuple": [1, 2, 3],
+                "need_task_ids": False,
+            },
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_emit_stream_anchors(self, send_message_mock):
+        # Emit with stream and anchors
+        self.bolt.emit([1, 2, 3], stream="foo", anchors=[4, 5], need_task_ids=False)
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "stream": "foo",
+                "anchors": [4, 5],
+                "tuple": [1, 2, 3],
+                "need_task_ids": False,
+            },
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_emit_direct(self, send_message_mock):
+        # Emit as a direct task
+        self.bolt.emit([1, 2, 3], direct_task="other_bolt")
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "anchors": [],
+                "tuple": [1, 2, 3],
+                "task": "other_bolt",
+            },
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_ack_id(self, send_message_mock):
+        # ack an ID
+        self.bolt.ack(42)
+        send_message_mock.assert_called_with(self.bolt, {"command": "ack", "id": 42})
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_ack_tuple(self, send_message_mock):
+        # ack a Tuple
+        self.bolt.ack(self.tup)
+        send_message_mock.assert_called_with(self.bolt, {"command": "ack", "id": 14})
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_fail_id(self, send_message_mock):
+        # fail an ID
+        self.bolt.fail(42)
+        send_message_mock.assert_called_with(self.bolt, {"command": "fail", "id": 42})
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_fail_tuple(self, send_message_mock):
+        # fail a Tuple
+        self.bolt.ack(self.tup)
+        send_message_mock.assert_called_with(self.bolt, {"command": "ack", "id": 14})
+
+    @patch.object(AsyncBolt, "process", autospec=True)
+    @patch.object(AsyncBolt, "ack", autospec=True)
+    def test_run(self, ack_mock, process_mock):
+        self.bolt._run()
+        process_mock.assert_called_with(self.bolt, self.tup)
+        self.assertListEqual(self.bolt._current_tups, [])
+
+    @patch.object(AsyncBolt, "process", autospec=True)
+    @patch.object(AsyncBolt, "ack", autospec=True)
+    def test_auto_ack_on(self, ack_mock, process_mock):
+        # test auto-ack on (the default)
+        self.bolt._reader.start()
+        self.bolt._writer.start()
+        self.bolt._processor.start()
+        self.bolt._run()
+        ack_mock.assert_called_with(self.bolt, self.tup)
+        self.assertEqual(ack_mock.call_count, 1)
+
+    @patch.object(AsyncBolt, "process", autospec=True)
+    @patch.object(AsyncBolt, "ack", autospec=True)
+    def test_auto_ack_off(self, ack_mock, process_mock):
+        self.bolt.auto_ack = False
+        self.bolt._reader.start()
+        self.bolt._writer.start()
+        self.bolt._processor.start()
+        self.bolt._run()
+        # Assert that this wasn't called, and print out what it was called with
+        # otherwise.
+        self.assertListEqual(ack_mock.call_args_list, [])
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_auto_anchor_on(self, send_message_mock):
+        self.bolt._current_tups = [self.tup]
+        # Test auto-anchor on (the default)
+        self.bolt.emit([1, 2, 3], need_task_ids=False)
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "anchors": [14],
+                "tuple": [1, 2, 3],
+                "need_task_ids": False,
+            },
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_auto_anchor_off(self, send_message_mock):
+        # Test auto-anchor off
+        self.bolt.auto_anchor = False
+        self.bolt.emit([1, 2, 3], need_task_ids=False)
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "anchors": [],
+                "tuple": [1, 2, 3],
+                "need_task_ids": False,
+            },
+        )
+
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_auto_anchor_override(self, send_message_mock):
+        # Test overriding auto-anchor
+        self.bolt.auto_anchor = True
+        self.bolt.emit([1, 2, 3], anchors=[42], need_task_ids=False)
+        send_message_mock.assert_called_with(
+            self.bolt,
+            {
+                "command": "emit",
+                "anchors": [42],
+                "tuple": [1, 2, 3],
+                "need_task_ids": False,
+            },
+        )
+
+    @patch.object(AsyncBolt, "read_handshake", new=lambda x: ({}, {}))
+    @patch.object(AsyncBolt, "fail", autospec=True)
+    @patch.object(AsyncBolt, "_run", autospec=True)
+    @patch.object(AsyncBolt, "_exit", new=lambda self, code: sys.exit(code))
+    def test_auto_fail_on(self, _run_mock, fail_mock):
+        self.bolt._current_tups = [self.tup]
+        # Make sure _run raises an exception
+        def raiser():  # lambdas can't raise
+            raise Exception("borkt")
+
+        _run_mock.side_effect = raiser
+
+        # test auto-fail on (the default)
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
+        fail_mock.assert_called_with(self.bolt, self.tup)
+        self.assertEqual(fail_mock.call_count, 1)
+
+    @patch.object(AsyncBolt, "read_handshake", new=lambda x: ({}, {}))
+    @patch.object(AsyncBolt, "raise_exception", new=lambda *a: None)
+    @patch.object(AsyncBolt, "fail", autospec=True)
+    @patch.object(AsyncBolt, "_run", autospec=True)
+    @patch.object(AsyncBolt, "_exit", new=lambda self, code: sys.exit(code))
+    def test_auto_fail_off(self, _run_mock, fail_mock):
+        self.bolt._current_tups = [self.tup]
+        # Make sure _run raises an exception
+        def raiser():  # lambdas can't raise
+            log.info("Raised borkt")
+            raise Exception("borkt")
+
+        _run_mock.side_effect = raiser
+
+        # test auto-fail off
+        self.bolt.auto_fail = False
+        with self.assertRaises(SystemExit):
+            self.bolt.run()
+        # Assert that this wasn't called, and print out what it was called with
+        # otherwise.
+        self.assertListEqual(fail_mock.call_args_list, [])
+
+    @patch.object(AsyncBolt, "read_tuple", autospec=True)
+    @patch.object(AsyncBolt, "send_message", autospec=True)
+    def test_heartbeat_response(self, send_message_mock, read_tuple_mock):
+        # Make sure we send sync for heartbeats
+        read_tuple_mock.return_value = Tuple(
+            id="foo", task=-1, stream="__heartbeat", values=(), component="__system"
+        )
+        self.bolt._reader.start()
+        self.bolt._writer.start()
+        self.bolt._processor.start()
+        self.bolt._run()
+        send_message_mock.assert_called_with(self.bolt, {"command": "sync"})
+
+    @patch.object(AsyncBolt, "read_tuple", autospec=True)
+    @patch.object(AsyncBolt, "process_tick", autospec=True)
+    def test_process_tick(self, process_tick_mock, read_tuple_mock):
+        # Make sure we send sync for heartbeats
+        read_tuple_mock.return_value = Tuple(
+            id=None, task=-1, component="__system", stream="__tick", values=(50,)
+        )
+        self.bolt._reader.start()
+        self.bolt._writer.start()
+        self.bolt._processor.start()
+        self.bolt._run()
+        process_tick_mock.assert_called_with(self.bolt, read_tuple_mock.return_value)
+
+    def test_read_tuple(self):
+        inputs = [  # Tuple with all values
+            (
+                '{ "id": "-6955786537413359385", "comp": "1", "stream": "1"'
+                ', "task": 9, "tuple": ["snow white and the seven dwarfs", '
+                '"field2", 3]}\n'
+            ),
+            "end\n",
+            # Tick Tuple
+            (
+                '{ "id": null, "task": -1, "comp": "__system", "stream": '
+                '"__tick", "tuple": [50]}\n'
+            ),
+            "end\n",
+            # Heartbeat Tuple
+            (
+                '{ "id": null, "task": -1, "comp": "__system", "stream": '
+                '"__heartbeat", "tuple": []}\n'
+            ),
+            "end\n",
+        ]
+        outputs = []
+        for msg in inputs[::2]:
+            output = json.loads(msg)
+            output["component"] = output["comp"]
+            output["values"] = tuple(output["tuple"])
+            del output["comp"]
+            del output["tuple"]
+            outputs.append(Tuple(**output))
+
+        self.bolt = AsyncBolt(
+            input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
+            output_stream=BytesIO(),
+        )
+
+        for output in outputs:
+            log.info("Checking Tuple for %r", output)
+            tup = self.bolt.read_tuple()
+            self.assertEqual(output, tup)
+
+    def test_read_tuple_named_fields(self):
+        inputs = [
+            (
+                '{ "id": "-6955786537413359385", "comp": "example-spout", '
+                '"stream": "default", "task": 9, "tuple": ["snow white and '
+                'the seven dwarfs", "field2", 3]}\n'
+            ),
+            "end\n",
+        ]
+
+        Example_SpoutDefaultTuple = namedtuple(
+            "Example_SpoutDefaultTuple", field_names=["sentence", "word", "number"]
+        )
+
+        self.bolt = AsyncBolt(
+            input_stream=BlockingBytesIO("".join(inputs).encode("utf-8")),
+            output_stream=BytesIO(),
+        )
+        self.bolt._setup_component(self.conf, self.context)
+
+        outputs = []
+        for msg in inputs[::2]:
+            output = json.loads(msg)
+            output["component"] = output["comp"]
+            output["values"] = Example_SpoutDefaultTuple(*output["tuple"])
+            del output["comp"]
+            del output["tuple"]
+            outputs.append(Tuple(**output))
+
+        for output in outputs:
+            log.info("Checking Tuple for %r", output)
+            tup = self.bolt.read_tuple()
+            self.assertEqual(output.values.sentence, tup.values.sentence)
+            self.assertEqual(output.values.word, tup.values.word)
+            self.assertEqual(output.values.number, tup.values.number)
+            self.assertEqual(output, tup)
 
 
 if __name__ == "__main__":
