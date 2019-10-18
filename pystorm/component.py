@@ -217,6 +217,8 @@ class Component(object):
         # Only default to SIGUSR1 on systems that have it
         if isinstance(rdb_signal, string_types) and hasattr(signal, rdb_signal):
             rdb_signal = getattr(signal, rdb_signal)
+        else:
+            rdb_signal = getattr(signal, 'SIGTERM')
 
         # Setup remote pdb handler if asked to
         if rdb_signal is not None:
