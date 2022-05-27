@@ -193,6 +193,7 @@ class Component(object):
     ):
         # Ensure we don't fall back on the platform-dependent encoding and
         # always use UTF-8
+        self.storm_id = None
         self.topology_name = None
         self.task_id = None
         self.component_name = None
@@ -231,6 +232,7 @@ class Component(object):
         """Add helpful instance variables to component after initial handshake
         with Storm.  Also configure logging.
         """
+        self.storm_id = storm_conf.get("storm.id", "")
         self.topology_name = storm_conf.get("topology.name", "")
         self.task_id = context.get("taskid", "")
         self.component_name = context.get("componentid")
@@ -263,6 +265,7 @@ class Component(object):
                         component_name=self.component_name,
                         task_id=self.task_id,
                         pid=self.pid,
+                        storm_id=self.storm_id,
                     )
                 ),
             )
