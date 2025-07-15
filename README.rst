@@ -42,3 +42,12 @@ Alphabetical, by last name:
 
 .. |Coverage| image:: https://coveralls.io/repos/github/pystorm/pystorm/badge.svg?branch=master
    :target: https://coveralls.io/github/pystorm/pystorm?branch=master
+
+Build / Publish (a8c)
+---------------------
+
+A `Makefile` was added to help building and publishing this package. Please note, we currently depend on `uv` to setup the Python enviroment. Some helpful commands:
+
+- `make test` -- runs unit tests
+- `make dist` (default) -- builds the distribution / wheel
+- `make publish` -- publishes the package to pypi.cogtree.com (login requried)
