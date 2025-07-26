@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Copyright 2014-2015 Parsely, Inc.
+Copyright Dan Blanchard
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+
 import re
 import sys
 
 from setuptools import setup, find_packages
+
 
 # Get version without importing, which avoids dependency issues
 def get_version():
@@ -28,7 +30,7 @@ def get_version():
 
 
 def readme():
-    """ Returns README.rst contents as str """
+    """Returns README.rst contents as str"""
     with open("README.rst") as f:
         return f.read()
 
@@ -51,8 +53,8 @@ setup_requires = []
 setup(
     name="pystorm",
     version=get_version(),
-    author="Parsely, Inc.",
-    author_email="hello@parsely.com",
+    author="Dan Blanchard",
+    author_email="dan.blanchard@gmail.com",
     url="https://github.com/pystorm/pystorm",
     description=("Battle-tested Apache Storm Multi-Lang implementation for Python."),
     long_description=readme(),

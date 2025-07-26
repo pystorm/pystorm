@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2014-2015 Parsely, Inc.
+# Copyright Dan Blanchard
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@
 This module exists solely for version information so we only have to change it
 in one place. Based on the suggestion `here. <http://bit.ly/16LbuJF>`_
 
-:organization: Parsely
+:organization: pystorm
 """
 
 
 def _safe_int(string):
-    """ Simple function to convert strings into ints without dying. """
+    """Simple function to convert strings into ints without dying."""
     try:
         return int(string)
     except ValueError:
