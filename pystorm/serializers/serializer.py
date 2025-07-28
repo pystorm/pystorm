@@ -18,6 +18,7 @@ class Serializer(object):
         self._writer_lock = writer_lock
         self.input_stream = input_stream
         self.output_stream = output_stream
+        self._stopped = False
 
     def read_message(self):
         """Return the dictionary message received on the input stream.
@@ -39,3 +40,10 @@ class Serializer(object):
     def serialize_dict(self, msg_dict):
         """Convert a message dictionary to bytes.  Used by send_message"""
         raise NotImplementedError
+
+    def stop(self):
+        """Stop any serializer infinite loops that may be running.
+
+        This is only needed for properly stopping multi-threading components.
+        """
+        self._stopped = True

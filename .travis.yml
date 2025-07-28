@@ -18,6 +18,10 @@ matrix:
     - python: '3.6'
       env: NO_MSGPACK=1
 
+env:
+  - GEVENT=true
+  - GEVENT=false
+
 install:
   - travis_retry pip install --upgrade pip setuptools
   - travis_retry pip install --upgrade --upgrade-strategy only-if-needed -r test-requirements.txt
@@ -26,12 +30,13 @@ install:
   - echo TRAVIS_PYTHON_VERSION=${TRAVIS_PYTHON_VERSION}
   - if [ ${NO_MSGPACK} == "1" ]; then travis_retry pip uninstall msgpack msgpack-python; fi
   - if [ ${NO_MSGPACK} == "0" ]; then travis_retry pip install msgpack; fi
+  - if [ "$GEVENT" = "true" ]; then travis_retry pip install gevent; fi
   - python setup.py --version
 
 # Run test
 script:
-  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then py.test --cov=pystorm --cov-config .coveragerc --timeout=10; fi
-  - if [ $TRAVIS_PYTHON_VERSION != "3.6" ]; then py.test --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION == "3.6" ]; then py.test -vv --cov=pystorm --cov-config .coveragerc --timeout=10; fi
+  - if [ $TRAVIS_PYTHON_VERSION != "3.6" ]; then py.test -vv --timeout=10; fi
 
 # Calculate coverage on success
 after_success:
